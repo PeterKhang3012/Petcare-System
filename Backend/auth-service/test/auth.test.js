@@ -1,0 +1,124 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { generateKeyPairSync } = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const Auth = require('../src/models/auth.model');
+const { seedStaff } = require('../scripts/seed-staff');
+const { authenticate, requireRole, requirePermission } = require('../src/middleware/auth.middleware');
+
+test('register/login, seed, JWT and authorization', async t => {
+ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-test-'));
+ const pair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+ const privateKey = pair.privateKey.export({ type: 'pkcs8', format: 'pem' });
+ fs.writeFileSync(path.join(dir, 'private.pem'), privateKey);
+ fs.writeFileSync(path.join(dir, 'public.pem'), pair.publicKey.export({ type: 'spki', format: 'pem' }));
+ const previousEnv = { ...process.env };
+ process.env.JWT_PRIVATE_KEY_PATH = path.join(dir, 'private.pem');
+ process.env.JWT_PUBLIC_KEY_PATH = path.join(dir, 'public.pem');
+ process.env.JWT_ISSUER = 'test-auth';
+ const rows = new Map();
+ t.mock.method(Auth, 'findById', async id => [...rows.values()].find(row => row._id === id) || null);
+ t.mock.method(Auth, 'exists', async ({ username }) => rows.has(username));
+ t.mock.method(Auth, 'findOne', ({ username }) => {
+  const value = Promise.resolve(rows.get(username) || null);
+  value.select = () => value;
+  return value;
+ });
+ t.mock.method(Auth, 'create', async data => {
+  if (rows.has(data.username)) throw Object.assign(new Error('duplicate'), { code: 11000 });
+  const user = { ...data, _id: String(rows.size + 1) };
+  rows.set(data.username, user);
+  return user;
+ });
+ const app = require('../src/app');
+ // Exercise middleware without adding a production endpoint.
+ const protectedApp = require('express')();
+ protectedApp.get('/', authenticate, requireRole('STAFF'), (_req, res) => res.json({ ok: true }));
+ protectedApp.patch('/price', authenticate, requirePermission('UPDATE_SERVICE_PRICE'), (_req, res) => res.json({ ok: true }));
+ const server = app.listen(0, '127.0.0.1');
+ const protectedServer = protectedApp.listen(0, '127.0.0.1');
+ await Promise.all([new Promise(r => server.on('listening', r)), new Promise(r => protectedServer.on('listening', r))]);
+ const base = 'http://127.0.0.1:' + server.address().port;
+ const protectedUrl = 'http://127.0.0.1:' + protectedServer.address().port;
+ const post = async (route, body) => {
+  const res = await fetch(base + '/api/auth/' + route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return { status: res.status, body: await res.json() };
+ };
+ try {
+  const credentials = { username: ' alice ', password: 'password123', role: 'STAFF', permissions: ['UPDATE_SERVICE_PRICE'] };
+  const registered = await post('register', credentials);
+  assert.equal(registered.status, 201);
+  assert.equal(registered.body.data.user.role, 'USER');
+  assert.deepEqual(registered.body.data.user.permissions, []);
+  assert.equal(JSON.stringify(registered.body).includes('password'), false);
+  assert.notEqual(rows.get('alice').password, credentials.password);
+  assert.ok(await bcrypt.compare(credentials.password, rows.get('alice').password));
+  assert.equal((await post('register', credentials)).status, 409);
+  assert.equal((await post('register', { username: {}, password: 'x' })).status, 400);
+  assert.equal((await post('register', { username: 'bad', password: 'a'.repeat(73) })).status, 400);
+  const normal = await post('login', credentials);
+  assert.equal(normal.status, 200);
+  const payload = require('../src/config/jwt').verifyToken(normal.body.data.accessToken);
+  assert.equal(payload.role, 'USER');
+  assert.equal(payload.sub, registered.body.data.user.id);
+  assert.ok(payload.exp > payload.iat);
+  const missing = await post('login', { username: 'missing', password: 'password123' });
+  const wrong = await post('login', { username: 'alice', password: 'wrongpass' });
+  assert.equal(missing.status, 401);
+  assert.deepEqual(missing.body, wrong.body);
+  assert.deepEqual(await seedStaff('staff01', 'staffpassword'), { created: true });
+  const hash = rows.get('staff01').password;
+  assert.deepEqual(await seedStaff('staff01', 'changedpassword'), { created: false });
+  assert.equal(rows.get('staff01').password, hash);
+  await assert.rejects(seedStaff('alice', 'password123'), /non-STAFF/);
+  const staff = await post('login', { username: 'staff01', password: 'staffpassword', role: 'USER' });
+  assert.equal(staff.status, 200);
+  assert.equal(staff.body.data.user.role, 'STAFF');
+  const getProtected = token => fetch(protectedUrl, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+  assert.equal((await getProtected()).status, 401);
+  assert.equal((await getProtected(normal.body.data.accessToken)).status, 403);
+  assert.equal((await getProtected(staff.body.data.accessToken)).status, 200);
+  const changePrice = token => fetch(protectedUrl + '/price', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token } });
+  assert.equal((await changePrice(normal.body.data.accessToken)).status, 403);
+  assert.equal((await changePrice(staff.body.data.accessToken)).status, 403);
+  await seedStaff('pricing', 'staffpassword', ['UPDATE_SERVICE_PRICE']);
+  const pricing = await post('login', { username: 'pricing', password: 'staffpassword' });
+  assert.deepEqual(require('../src/config/jwt').verifyToken(pricing.body.data.accessToken).permissions, ['UPDATE_SERVICE_PRICE']);
+  assert.equal((await changePrice(pricing.body.data.accessToken)).status, 200);
+  await assert.rejects(seedStaff('pricing', 'staffpassword'), /permissions differ/);
+  await assert.rejects(seedStaff('invalid', 'staffpassword', ['ADMIN']), /Invalid permissions/);
+  const me = await fetch(base + '/api/auth/me', { headers: { Authorization: 'Bearer ' + pricing.body.data.accessToken } });
+  assert.equal(me.status, 200);
+  assert.deepEqual((await me.json()).data.user.permissions, ['UPDATE_SERVICE_PRICE']);
+  rows.get('pricing').permissions = [];
+  assert.equal((await changePrice(pricing.body.data.accessToken)).status, 403);
+  rows.delete('pricing');
+  assert.equal((await changePrice(pricing.body.data.accessToken)).status, 401);
+  const invalidPermission = jwt.sign({ sub: '1', username: 'alice', role: 'USER', permissions: ['UPDATE_SERVICE_PRICE'] }, privateKey, { algorithm: 'RS256', issuer: 'test-auth', expiresIn: '1h' });
+  assert.equal((await getProtected(invalidPermission)).status, 401);
+  const claims = { sub: '1', username: 'alice', role: 'USER' };
+  const expired = jwt.sign(claims, privateKey, { algorithm: 'RS256', issuer: 'test-auth', expiresIn: -1 });
+  assert.equal((await getProtected(expired)).status, 401);
+  const other = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const badSignature = jwt.sign(claims, other.privateKey, { algorithm: 'RS256', issuer: 'test-auth', expiresIn: '1h' });
+  assert.equal((await getProtected(badSignature)).status, 401);
+  const badIssuer = jwt.sign(claims, privateKey, { algorithm: 'RS256', issuer: 'other', expiresIn: '1h' });
+  assert.equal((await getProtected(badIssuer)).status, 401);
+  let allowed = false;
+  requireRole('USER')({ user: { role: 'USER' } }, {}, () => { allowed = true; });
+  assert.equal(allowed, true);
+  t.mock.method(Auth, 'exists', async () => false);
+  t.mock.method(Auth, 'create', async () => { throw Object.assign(new Error('race'), { code: 11000 }); });
+  await assert.rejects(require('../src/services/auth.service').register('race', 'password123'), { status: 409 });
+ } finally {
+  await Promise.all([new Promise(r => server.close(r)), new Promise(r => protectedServer.close(r))]);
+  fs.rmSync(dir, { recursive: true, force: true });
+  for (const name of ['JWT_PRIVATE_KEY_PATH', 'JWT_PUBLIC_KEY_PATH', 'JWT_ISSUER']) {
+   if (previousEnv[name] === undefined) delete process.env[name]; else process.env[name] = previousEnv[name];
+  }
+ }
+});
