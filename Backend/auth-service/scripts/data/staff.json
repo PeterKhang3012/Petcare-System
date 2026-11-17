@@ -1,0 +1,12 @@
+[
+  { "username": "staff01", "password": "PawStay01!2026", "permissions": ["UPDATE_SERVICE_PRICE"] },
+  { "username": "staff02", "password": "PawStay02!2026", "permissions": [] },
+  { "username": "staff03", "password": "PawStay03!2026", "permissions": [] },
+  { "username": "staff04", "password": "PawStay04!2026", "permissions": [] },
+  { "username": "staff05", "password": "PawStay05!2026", "permissions": [] },
+  { "username": "staff06", "password": "PawStay06!2026", "permissions": [] },
+  { "username": "staff07", "password": "PawStay07!2026", "permissions": [] },
+  { "username": "staff08", "password": "PawStay08!2026", "permissions": [] },
+  { "username": "staff09", "password": "PawStay09!2026", "permissions": [] },
+  { "username": "staff10", "password": "PawStay10!2026", "permissions": [] }
+]

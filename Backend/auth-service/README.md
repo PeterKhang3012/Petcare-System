@@ -218,17 +218,12 @@ Service khác không được đọc trực tiếp database Auth. Có thể xác
 
 ## Khởi tạo nhân viên
 
-Trong `.env`:
+Danh sách 10 tài khoản nằm trong `scripts/data/staff.json`
 
-```dotenv
-STAFF_USERNAME=staff01
-STAFF_PASSWORD=replace-with-a-strong-password
-STAFF_PERMISSIONS=
+```powershell
+npm run seed:staff
 ```
-
-Chạy `npm run seed:staff` để tạo nhân viên thường. Để tạo nhân viên được ủy quyền, dùng username khác và `STAFF_PERMISSIONS=UPDATE_SERVICE_PRICE`, rồi chạy lại lệnh. Không có mật khẩu mẫu được tự tạo trong database.
-
-Script chỉ tạo tài khoản nếu username chưa tồn tại; USER trùng tên hoặc STAFF có quyền khác cấu hình gây lỗi, không sửa tài khoản. STAFF cùng quyền được giữ nguyên cả hash. Muốn thay đổi quyền tài khoản có sẵn, người triển khai phải cập nhật có kiểm soát trong MongoDB sau khi kiểm tra đúng tài khoản STAFF; không có API/web tự cấp quyền. Script chỉ quản lý tài khoản Auth, không tác động dữ liệu giá Catalog.
+Trong đó có 1 tài khoản đầu sẽ có quyền cao nhất, còn các tài khoản khác sẽ là của nhân viên
 
 ## Tương thích dữ liệu cũ
 
@@ -241,3 +236,4 @@ Chạy `npm test`. Đã chạy thành công 2 bài kiểm thử: luồng HTTP d�
 Rà soát và khôi phục ngày 17/11/2026: viết lại auth.service.js theo CommonJS, sửa đường dẫn model, khôi phục export đăng ký và publicUser, lấy password bằng select('+password') khi đăng nhập; khôi phục permissions và kiểm tra role bắt buộc trong model; xóa ký tự thừa gây lỗi nạp middleware. Bổ sung từ chối role tài khoản không hợp lệ, kiểm tra sub JWT là chuỗi không rỗng và trả 401 khi sub không thể chuyển thành ID MongoDB. Đã kiểm tra cú pháp toàn bộ file JavaScript trong src, scripts, test và server.js.
 
 Chưa kiểm thử với MongoDB đang chạy, unique index thực tế hoặc toàn bộ các service nghiệp vụ; không tạo tài khoản thực. Không có refresh token, logout thu hồi token riêng lẻ hay giới hạn số lần đăng nhập. Workspace không có Git repository nên không thể xác minh bằng git diff/status.
+

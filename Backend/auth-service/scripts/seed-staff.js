@@ -8,6 +8,7 @@ const Auth = require("../src/models/auth.model");
 const { connectDatabase } = require("../src/config/database");
 const { validateCredentials } = require("../src/utils/validation");
 const { validatePermissions } = require("../src/config/authorization");
+const staffRecords = require("./data/staff.json");
 
 async function seedStaff(username, password, permissions = []) {
   permissions = validatePermissions("STAFF", permissions);
@@ -41,23 +42,26 @@ async function seedStaff(username, password, permissions = []) {
 
 async function main() {
   try {
-    validateCredentials(process.env.STAFF_USERNAME, process.env.STAFF_PASSWORD);
-    const permissions = (process.env.STAFF_PERMISSIONS || "")
-      .split(",")
-      .map((permission) => permission.trim())
-      .filter(Boolean);
-    validatePermissions("STAFF", permissions);
+    const usernames = new Set();
+    for (const record of staffRecords) {
+      const username = validateCredentials(record.username, record.password);
+      validatePermissions("STAFF", record.permissions);
+      if (usernames.has(username)) throw new Error('Duplicate username in staff seed data');
+      usernames.add(username);
+    }
     await connectDatabase();
-    const result = await seedStaff(
-      process.env.STAFF_USERNAME,
-      process.env.STAFF_PASSWORD,
-      permissions,
-    );
-    console.log(
-      result.created
-        ? "STAFF account created"
-        : "STAFF account already exists; unchanged",
-    );
+    // Review all existing accounts before creating any records.
+    for (const record of staffRecords) {
+      const existing = await Auth.findOne({ username: record.username.trim() });
+      if (existing && (existing.role.toUpperCase() !== 'STAFF' ||
+          JSON.stringify(existing.permissions || []) !== JSON.stringify(record.permissions))) {
+        throw new Error(`Account ${record.username} conflicts with seed role/permissions; unchanged`);
+      }
+    }
+    for (const record of staffRecords) {
+      const result = await seedStaff(record.username, record.password, record.permissions);
+      console.log(`${record.username}: ${result.created ? 'created' : 'already exists; unchanged'}`);
+    }
   } finally {
     await mongoose.disconnect();
   }
