@@ -1,0 +1,4 @@
+[
+  { "service_id": "bath", "name": "Demo bath", "type": "CARE", "price_version_id": "bath-v1", "unit_price": 150000, "currency": "VND", "unit": "SERVICE", "duration_minutes": 60, "allowed_species": ["DOG", "CAT"], "min_weight_kg": 0, "max_weight_kg": 40 },
+  { "service_id": "boarding", "name": "Demo boarding per night", "type": "BOARDING", "price_version_id": "boarding-v1", "unit_price": 200000, "currency": "VND", "unit": "NIGHT", "duration_minutes": null, "allowed_species": ["DOG", "CAT"], "min_weight_kg": 0, "max_weight_kg": 40 }
+]

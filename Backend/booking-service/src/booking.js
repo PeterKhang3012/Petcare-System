@@ -1,0 +1,235 @@
+const { randomUUID } = require('node:crypto');
+const { fail, invalid, id, text, object, fingerprint, requestKey } = require('./platform');
+const { validQuote } = require('./adapters');
+const { transaction, lock } = require('./transactions');
+const { calculate, overlap, liveAllocation, MINUTE, DAY } = require('./time');
+const { present } = require('./models');
+class BookingService {
+  constructor({ connection, models, config, clients, clock = () => new Date() }) {
+    Object.assign(this, { connection, models, config, clients, clock });
+  }
+  async replay(scope, key, hash, session) {
+    const found = await this.models.Processed.findOne({ scope, key }).session(session || null).lean();
+    if (found && found.fingerprint !== hash) fail(409, 'IDEMPOTENCY_CONFLICT', 'This request key was used with a different payload');
+    return found?.result;
+  }
+  async remember(scope, key, hash, result, session) {
+    await this.models.Processed.create([{ scope, key, fingerprint: hash, result }], { session });
+  }
+  async history(data, session) {
+    await this.models.History.create([{ ...data, at: this.clock() }], { session });
+  }
+  async move(booking, status, actor, reason, session) {
+    const before = booking.status, at = this.clock();
+    const timeField = { CONFIRMED: 'confirmed_at', CHECKED_IN: 'checked_in_at', COMPLETED: 'completed_at', CANCELLED: 'cancelled_at', EXPIRED: 'expired_at' }[status];
+    await this.models.Booking.updateOne({ _id: booking._id, status: before }, { $set: { status, [timeField]: at, updated_at: at } }, { session, timestamps: false });
+    await this.history({ booking_id: booking._id, resource_id: booking.resource_id, action: status, from: before, to: status, ...actor, reason }, session);
+    booking.status = status; booking[timeField] = at; booking.updated_at = at;
+  }
+  async expireInside(booking, session, now = this.clock()) {
+    if (booking.status !== 'PENDING_PAYMENT' || +booking.expires_at > +now) return false;
+    await this.move(booking, 'EXPIRED', { actor_type: 'WORKER', actor_id: 'booking-expiry' }, 'Hold expired after 15 minutes', session);
+    await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { active: false } }, { session });
+    return true;
+  }
+  async withBooking(bookingId, ownerId, operation) {
+    const filter = { _id: bookingId, ...(ownerId ? { owner_id: ownerId } : {}) };
+    const before = await this.models.Booking.findOne(filter).lean();
+    if (!before) fail(404, 'NOT_FOUND', 'Booking not found');
+    return transaction(this.connection, async session => {
+      await lock(this.models, session, before.pet_id, [before.resource_id]);
+      const booking = await this.models.Booking.findOne(filter).session(session).lean();
+      if (!booking) fail(404, 'NOT_FOUND', 'Booking not found');
+      return operation(booking, session);
+    });
+  }
+  async expire(bookingId) {
+    return this.withBooking(bookingId, null, (booking, session) => this.expireInside(booking, session));
+  }
+  async get(bookingId, ownerId) {
+    let booking = await this.models.Booking.findOne({ _id: bookingId, ...(ownerId ? { owner_id: ownerId } : {}) }).lean();
+    if (!booking) fail(404, 'NOT_FOUND', 'Booking not found');
+    if (booking.status === 'PENDING_PAYMENT' && +booking.expires_at <= +this.clock()) {
+      await this.expire(booking._id);
+      booking = await this.models.Booking.findById(booking._id).lean();
+    }
+    return booking;
+  }
+  async prepare(input, ownerId, correlationId) {
+    const pet = await this.clients.pet(input.pet_id, ownerId, correlationId);
+    const catalog = validQuote(await this.clients.catalog(input.service_id, pet, correlationId), input.service_id);
+    if (!catalog.allowed_species.includes(pet.species) || pet.weight_kg < catalog.min_weight_kg || pet.weight_kg > catalog.max_weight_kg) invalid('The service does not support this pet');
+    const quote = calculate(input, catalog, this.config, this.clock());
+    const resources = await this.models.Resource.find({ group: catalog.type, species: pet.species, max_weight_kg: { $gte: pet.weight_kg } }).sort({ _id: 1 }).lean();
+    return { pet, catalog, quote, resources };
+  }
+  quoteView(prepared) {
+    return { service: prepared.catalog, ...prepared.quote, catalog_mode: this.config.catalogMode, facility_timezone: 'Asia/Ho_Chi_Minh', holds_resource: false };
+  }
+  async availability(prepared) {
+    const now = this.clock(), { quote, resources } = prepared;
+    const blocked = await this.models.Allocation.find({ resource_id: { $in: resources.map(r => r._id) }, ...liveAllocation(now), ...overlap(quote.allocation_start_at, quote.allocation_end_at) }).select('resource_id').lean();
+    const blockedIds = new Set(blocked.map(a => String(a.resource_id)));
+    // Only counts and resource codes: no allocations, customer IDs or pet details.
+    return { available: resources.filter(r => !blockedIds.has(String(r._id))).map(r => ({ id: String(r._id), code: r.code, group: r.group })), holds_resource: false };
+  }
+  async create(input, ownerId, key, correlationId) {
+    const scope = `CREATE:${ownerId}`, hash = fingerprint(input);
+    const replay = await this.replay(scope, key, hash);
+    if (replay) return { booking: present(await this.get(replay.booking_id, ownerId)), replayed: true };
+    // All HTTP is completed BEFORE the transaction; callback retries reuse this quote.
+    const prepared = await this.prepare(input, ownerId, correlationId);
+    const { pet, catalog, quote, resources } = prepared;
+    if (input.expected_price_version !== catalog.price_version_id) fail(409, 'PRICE_CHANGED', 'The price changed; confirm the new quote', { quote: this.quoteView(prepared) });
+    if (!resources.length) fail(409, 'SLOT_UNAVAILABLE', 'No compatible resource');
+    return transaction(this.connection, async session => {
+      await lock(this.models, session, pet.id, resources.map(r => r._id));
+      const existing = await this.replay(scope, key, hash, session);
+      if (existing) return { booking: present(await this.models.Booking.findById(existing.booking_id).session(session).lean()), replayed: true };
+      const now = this.clock();
+      if (+quote.start_at <= +now) invalid('The booking must start in the future');
+      const petBusy = await this.models.Booking.exists({ pet_id: pet.id, ...overlap(quote.start_at, quote.end_at),
+        $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }] }).session(session);
+      if (petBusy) fail(409, 'PET_TIME_CONFLICT', 'This pet already has an overlapping booking');
+      let selected;
+      for (const resource of resources) {
+        if (!await this.models.Allocation.exists({ resource_id: resource._id, ...liveAllocation(now), ...overlap(quote.allocation_start_at, quote.allocation_end_at) }).session(session)) { selected = resource; break; }
+      }
+      if (!selected) fail(409, 'SLOT_UNAVAILABLE', 'All compatible resources are allocated');
+      const expires = new Date(+now + 15 * MINUTE);
+      const [booking] = await this.models.Booking.create([{ ...quote, owner_id: ownerId, pet_id: pet.id, pet_version: pet.version,
+        pet_snapshot: pet, service_id: catalog.service_id, service_snapshot: catalog,
+        resource_id: selected._id, expires_at: expires, status: 'PENDING_PAYMENT', created_at: now, updated_at: now }], { session, timestamps: false });
+      await this.models.Allocation.create([{ booking_id: booking._id, pet_id: pet.id, resource_id: selected._id, type: 'BOOKING',
+        start_at: quote.allocation_start_at, end_at: quote.allocation_end_at, active: true, hold_until: expires }], { session });
+      await this.history({ booking_id: booking._id, resource_id: selected._id, action: 'CREATED', to: 'PENDING_PAYMENT', actor_id: ownerId, actor_type: 'USER', reason: 'Customer created booking' }, session);
+      await this.remember(scope, key, hash, { booking_id: String(booking._id) }, session);
+      return { booking: present(booking), replayed: false };
+    });
+  }
+  async cancel(bookingId, ownerId, key, body) {
+    object(body, ['reason']); const reason = text(body.reason, 'reason', 500);
+    const scope = `CANCEL:${ownerId}`, hash = fingerprint({ booking_id: bookingId, reason });
+    const previous = await this.replay(scope, key, hash);
+    if (previous) return previous;
+    return this.withBooking(bookingId, ownerId, async (booking, session) => {
+      const old = await this.replay(scope, key, hash, session); if (old) return old;
+      const now = this.clock(); await this.expireInside(booking, session, now);
+      let result;
+      if (booking.status === 'EXPIRED') result = { status: 409, code: 'BOOKING_EXPIRED', message: 'The hold expired; create a new booking' };
+      else if (booking.status === 'CANCELLED') result = { status: 200, data: { booking: present(booking) } };
+      else if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status) || (booking.status === 'CONFIRMED' && +booking.start_at - +now < DAY)) result = { status: 409, code: 'INVALID_BOOKING_STATE', message: 'Cancellation requires an unpaid hold or a confirmed booking at least 24 hours before start' };
+      else {
+        const paid = booking.status === 'CONFIRMED';
+        await this.move(booking, 'CANCELLED', { actor_id: ownerId, actor_type: 'USER' }, reason, session);
+        await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { active: false } }, { session });
+        if (paid) await this.models.Outbox.create([{ event_id: randomUUID(), type: 'REFUND_REQUESTED',
+          payload: { booking_id: String(booking._id), payment_id: booking.accepted_payment_id, amount: booking.total_amount, currency: booking.currency, reason },
+          status: 'PENDING', next_attempt_at: now, lease_until: null }], { session });
+        result = { status: 200, data: { booking: present(booking), refund_request: paid ? 'PENDING_DELIVERY' : null } };
+      }
+      await this.remember(scope, key, hash, result, session); return result;
+    });
+  }
+  async paymentContext(bookingId) {
+    const booking = await this.get(bookingId);
+    if (booking.status === 'EXPIRED') fail(409, 'BOOKING_EXPIRED', 'The hold expired');
+    if (booking.status !== 'PENDING_PAYMENT') fail(409, 'INVALID_BOOKING_STATE', 'Only a live unpaid booking can start a payment');
+    return { booking_id: String(booking._id), owner_id: booking.owner_id, amount: booking.total_amount, currency: booking.currency,
+      price_version_id: booking.price_version_id, expires_at: booking.expires_at, status: booking.status };
+  }
+  async payment(body) {
+    object(body, ['event_id', 'booking_id', 'payment_id', 'amount', 'currency', 'result']);
+    const payload = { event_id: requestKey(body.event_id, 'event_id'), booking_id: id(body.booking_id, 'booking_id'),
+      payment_id: requestKey(body.payment_id, 'payment_id'), amount: body.amount, currency: text(body.currency, 'currency', 10), result: body.result };
+    if (!Number.isSafeInteger(payload.amount) || payload.amount <= 0 || !['SUCCEEDED', 'FAILED', 'PENDING'].includes(payload.result)) invalid('Invalid payment amount or result');
+    const hash = fingerprint(payload), scope = 'PAYMENT';
+    const old = await this.replay(scope, payload.event_id, hash); if (old) return old;
+    const exists = await this.models.Booking.exists({ _id: payload.booking_id });
+    if (!exists) {
+      return transaction(this.connection, async session => {
+        const replay = await this.replay(scope, payload.event_id, hash, session); if (replay) return replay;
+        const result = { accepted: false, outcome: 'BOOKING_NOT_FOUND', retryable: false };
+        await this.remember(scope, payload.event_id, hash, result, session); return result;
+      });
+    }
+    return this.withBooking(payload.booking_id, null, async (booking, session) => {
+      const replay = await this.replay(scope, payload.event_id, hash, session); if (replay) return replay;
+      await this.expireInside(booking, session);
+      let outcome, accepted = false;
+      const claim = await this.models.PaymentClaim.findById(payload.payment_id).session(session).lean();
+      if (claim && String(claim.booking_id) !== String(booking._id)) outcome = 'PAYMENT_ALREADY_USED';
+      else if (payload.amount !== booking.total_amount || payload.currency !== booking.currency) outcome = 'AMOUNT_OR_CURRENCY_MISMATCH';
+      else if (payload.result !== 'SUCCEEDED') outcome = booking.accepted_payment_id ? 'SUCCESS_PRESERVED' : `PAYMENT_${payload.result}`;
+      else if (booking.accepted_payment_id) {
+        accepted = booking.accepted_payment_id === payload.payment_id;
+        outcome = accepted ? 'ALREADY_ACCEPTED' : 'ANOTHER_PAYMENT_ACCEPTED';
+      } else if (booking.status !== 'PENDING_PAYMENT') outcome = `BOOKING_${booking.status}`;
+      else {
+        if (!claim) await this.models.PaymentClaim.create([{ _id: payload.payment_id, booking_id: booking._id }], { session });
+        await this.models.Booking.updateOne({ _id: booking._id }, { $set: { accepted_payment_id: payload.payment_id } }, { session });
+        booking.accepted_payment_id = payload.payment_id;
+        await this.move(booking, 'CONFIRMED', { actor_type: 'PAYMENT', actor_id: 'payment' }, 'Verified full payment accepted within the hold', session);
+        await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { hold_until: null } }, { session });
+        accepted = true; outcome = 'CONFIRMED';
+      }
+      const result = { accepted, outcome, retryable: false, booking_id: String(booking._id), booking_status: booking.status };
+      await this.remember(scope, payload.event_id, hash, result, session); return result;
+    });
+  }
+  async care(operation, body) {
+    object(body, ['request_id', 'booking_id', 'actor_id', 'reason']);
+    const payload = { operation, request_id: requestKey(body.request_id, 'request_id'), booking_id: id(body.booking_id, 'booking_id'),
+      actor_id: id(body.actor_id, 'actor_id'), reason: text(body.reason, 'reason', 500) };
+    const hash = fingerprint(payload), scope = 'CARE';
+    const old = await this.replay(scope, payload.request_id, hash); if (old) return old;
+    if (!await this.models.Booking.exists({ _id: payload.booking_id })) {
+      return transaction(this.connection, async session => {
+        const replay = await this.replay(scope, payload.request_id, hash, session); if (replay) return replay;
+        const result = { status: 404, code: 'NOT_FOUND', message: 'Booking not found' };
+        await this.remember(scope, payload.request_id, hash, result, session); return result;
+      });
+    }
+    return this.withBooking(payload.booking_id, null, async (booking, session) => {
+      const replay = await this.replay(scope, payload.request_id, hash, session); if (replay) return replay;
+      const now = this.clock(); await this.expireInside(booking, session, now);
+      const resource = await this.models.Resource.findById(booking.resource_id).session(session).lean();
+      let result;
+      const reject = (code, message) => ({ status: 409, code, message });
+      if (operation === 'check-in') {
+        const maintenance = await this.models.Maintenance.exists({ resource_id: resource._id, status: 'ACTIVE', start_at: { $lte: now }, end_at: { $gt: now } }).session(session);
+        const petInCare = await this.models.Booking.exists({ pet_id: booking.pet_id, status: 'CHECKED_IN', _id: { $ne: booking._id } }).session(session);
+        const actualStart = new Date(Math.min(+now, +booking.allocation_start_at));
+        const earlyConflict = await this.models.Allocation.exists({ resource_id: resource._id, booking_id: { $ne: booking._id }, ...liveAllocation(now), ...overlap(actualStart, booking.allocation_end_at) }).session(session);
+        const petEarlyConflict = await this.models.Booking.exists({ pet_id: booking.pet_id, _id: { $ne: booking._id }, ...overlap(new Date(Math.min(+now, +booking.start_at)), booking.end_at),
+          $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }] }).session(session);
+        if (booking.status !== 'CONFIRMED') result = reject('INVALID_BOOKING_STATE', 'Check-in requires CONFIRMED');
+        else if (+now < +booking.start_at - this.config.checkInEarlyMinutes * MINUTE || +now > +booking.start_at + this.config.checkInLateMinutes * MINUTE || +now >= +booking.end_at) result = reject('INVALID_BOOKING_STATE', 'Outside the configured check-in window');
+        else if (resource.state !== 'READY' || resource.occupied_booking_id || maintenance || petInCare || earlyConflict || petEarlyConflict) result = reject('SLOT_UNAVAILABLE', 'The resource or pet is not ready for check-in (including preparation/cleaning allocations)');
+        else {
+          await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { start_at: actualStart } }, { session });
+          await this.move(booking, 'CHECKED_IN', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session);
+          await this.models.Resource.updateOne({ _id: resource._id }, { $set: { state: 'OCCUPIED', occupied_booking_id: booking._id, updated_at: now } }, { session, timestamps: false });
+          resource.state = 'OCCUPIED'; resource.occupied_booking_id = booking._id; resource.updated_at = now;
+          result = { status: 200, data: { booking: present(booking), resource: present(resource) } };
+        }
+      } else {
+        if (booking.status !== 'CHECKED_IN' || String(resource.occupied_booking_id) !== String(booking._id) || resource.state !== 'OCCUPIED') result = reject('INVALID_BOOKING_STATE', 'Check-out requires this booking to occupy the resource');
+        else {
+          const bufferEnd = new Date(Math.max(+booking.end_at, +now) + booking.cleaning_minutes * MINUTE);
+          const conflict = await this.models.Allocation.exists({ resource_id: resource._id, booking_id: { $ne: booking._id }, ...liveAllocation(now), ...overlap(booking.allocation_start_at, bufferEnd) }).session(session);
+          if (conflict) result = reject('SLOT_UNAVAILABLE', 'Actual service/cleaning would overlap a future allocation; resolve the conflict before retrying with a new request_id');
+          else {
+            await this.move(booking, 'COMPLETED', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session);
+            await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { end_at: bufferEnd, hold_until: null } }, { session });
+            await this.models.Resource.updateOne({ _id: resource._id }, { $set: { state: 'CLEANING', occupied_booking_id: null, updated_at: now } }, { session, timestamps: false });
+            resource.state = 'CLEANING'; resource.occupied_booking_id = null; resource.updated_at = now;
+            result = { status: 200, data: { booking: present(booking), resource: present(resource) } };
+          }
+        }
+      }
+      await this.remember(scope, payload.request_id, hash, result, session); return result;
+    });
+  }
+}
+module.exports = { BookingService };
