@@ -18,7 +18,7 @@ From the repository root, configure the root `.env` using `.env.example` and run
 docker compose up -d --build --wait
 ```
 
-Compose starts Payment with its own MySQL 8.4 container and runs Flyway at startup. It connects to Booking on the Compose network and to Auth on the Windows host. Keep VNPAY settings in `Backend/payment-service/.env`. The host Payment port defaults to 8084. If you change `PAYMENT_HOST_PORT`, update the local browser return URL accordingly. MySQL initialization credentials apply when the volume is first created.
+Compose starts Payment with its own MySQL 8.4 container and runs Flyway at startup. It connects to Booking and Auth by service name on the Compose network. Keep VNPAY settings in `Backend/payment-service/.env`. The host Payment port defaults to 8084. If you change `PAYMENT_HOST_PORT`, update the local browser return URL accordingly. MySQL initialization credentials apply when the volume is first created.
 
 ## Run with Docker Desktop
 

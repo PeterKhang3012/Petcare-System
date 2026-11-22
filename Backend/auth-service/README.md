@@ -1,4 +1,4 @@
-﻿# PawStay Auth Service
+# PawStay Auth Service
 
 Auth service dùng Node.js, Express, MongoDB/Mongoose, bcryptjs và JWT RS256. Triển khai theo `docs/idea.md`, mục 3–4 và 6: chỉ có Chủ thú cưng và Nhân viên; không có Admin. Giữ nguyên công nghệ hiện tại dù tài liệu ý tưởng đề xuất FastAPI/MySQL.
 
@@ -237,3 +237,17 @@ Rà soát và khôi phục ngày 17/11/2026: viết lại auth.service.js theo C
 
 Chưa kiểm thử với MongoDB đang chạy, unique index thực tế hoặc toàn bộ các service nghiệp vụ; không tạo tài khoản thực. Không có refresh token, logout thu hồi token riêng lẻ hay giới hạn số lần đăng nhập. Workspace không có Git repository nên không thể xác minh bằng git diff/status.
 
+## Chạy bằng Docker
+
+Từ thư mục Auth Service, build image và dùng cặp khóa đã tạo trên máy:
+
+```powershell
+docker build -t pawstay-auth:local .
+$authKeys = (Resolve-Path ./keys).Path
+docker run --rm --name pawstay-auth --env-file .env `
+  --mount "type=bind,source=$authKeys,target=/app/keys,readonly" `
+  -e JWT_PRIVATE_KEY_PATH=/app/keys/private.pem -e JWT_PUBLIC_KEY_PATH=/app/keys/public.pem `
+  -e PORT=3001 -p 127.0.0.1:3001:3001 pawstay-auth:local
+```
+
+Khi MongoDB chạy trên Windows, dùng `host.docker.internal` trong `MONGODB_URI` của container và giữ database cùng thông tin đăng nhập hiện có. Nếu MongoDB chạy trong Docker, thêm `--network <network>` và dùng tên service MongoDB trong URI. Dừng Auth chạy trực tiếp trước khi chạy container trên cùng cổng `3001`. Tạo khóa và seed nhân viên bằng các lệnh ở trên từ máy host.

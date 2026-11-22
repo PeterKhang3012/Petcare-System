@@ -1,5 +1,5 @@
 x-service-environment: &service-environment
-  AUTH_BASE_URL: ${AUTH_BASE_URL_DOCKER:-http://host.docker.internal:3001}
+  AUTH_BASE_URL: http://auth-service:3001
   JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
   JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
   BOOKING_TO_PET_TOKEN: ${BOOKING_TO_PET_TOKEN:?Set BOOKING_TO_PET_TOKEN in the root .env}
@@ -13,6 +13,42 @@ x-public-key: &public-key
     create_host_path: false
 
 services:
+  auth-mongodb:
+    image: mongo:8.0
+    volumes:
+      - auth_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  auth-service:
+    build: ./Backend/auth-service
+    env_file:
+      - path: ./Backend/auth-service/.env
+        required: false
+        format: raw
+    environment:
+      PORT: 3001
+      MONGODB_URI: mongodb://auth-mongodb:27017/pawstay_auth
+      JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+    volumes:
+      - *public-key
+      - type: bind
+        source: ./Backend/auth-service/keys/private.pem
+        target: /app/keys/private.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:${AUTH_HOST_PORT:-3001}:3001"
+    depends_on:
+      auth-mongodb:
+        condition: service_healthy
+
   booking-mongodb:
     image: mongo:8.0
     command: ["mongod", "--replSet", "pawstay-demo", "--bind_ip_all"]
@@ -47,6 +83,8 @@ services:
     ports:
       - "127.0.0.1:${PET_HOST_PORT:-3002}:3002"
     depends_on:
+      auth-service:
+        condition: service_healthy
       booking-mongodb:
         condition: service_healthy
 
@@ -66,6 +104,8 @@ services:
     ports:
       - "127.0.0.1:${BOOKING_HOST_PORT:-3003}:3003"
     depends_on:
+      auth-service:
+        condition: service_healthy
       booking-mongodb:
         condition: service_healthy
       pet-service:
@@ -97,7 +137,7 @@ services:
       PAYMENT_DB_URL: jdbc:mysql://payment-mysql:3306/payment_db?allowPublicKeyRetrieval=true
       PAYMENT_DB_USERNAME: payment_app
       PAYMENT_DB_PASSWORD: ${PAYMENT_MYSQL_PASSWORD:?Set PAYMENT_MYSQL_PASSWORD in the root .env}
-      AUTH_SERVICE_URL: ${AUTH_BASE_URL_DOCKER:-http://host.docker.internal:3001}
+      AUTH_SERVICE_URL: http://auth-service:3001
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
       JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
       BOOKING_SERVICE_URL: http://booking-service:3003
@@ -107,6 +147,8 @@ services:
     ports:
       - "127.0.0.1:${PAYMENT_HOST_PORT:-8084}:8084"
     depends_on:
+      auth-service:
+        condition: service_healthy
       payment-mysql:
         condition: service_healthy
       booking-service:
@@ -118,5 +160,6 @@ services:
       retries: 20
 
 volumes:
+  auth_mongo_data:
   booking_mongo_data:
   payment_mysql_data:
