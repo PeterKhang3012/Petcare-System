@@ -1,0 +1,75 @@
+x-service-environment: &service-environment
+  AUTH_BASE_URL: ${AUTH_BASE_URL_DOCKER:-http://host.docker.internal:3001}
+  JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
+  JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+  BOOKING_TO_PET_TOKEN: ${BOOKING_TO_PET_TOKEN:?Set BOOKING_TO_PET_TOKEN in the root .env}
+
+x-public-key: &public-key
+  type: bind
+  source: ./Backend/auth-service/keys/public.pem
+  target: /app/keys/auth-public.pem
+  read_only: true
+  bind:
+    create_host_path: false
+
+services:
+  booking-mongodb:
+    image: mongo:8.0
+    command: ["mongod", "--replSet", "pawstay-demo", "--bind_ip_all"]
+    volumes:
+      - booking_mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --host
+        - 127.0.0.1
+        - --eval
+        - >-
+          try { rs.status(); } catch (error) {
+            if (error.code !== 94) throw error;
+            rs.initiate({_id:'pawstay-demo',members:[{_id:0,host:'booking-mongodb:27017'}]});
+          }
+          quit(db.hello().isWritablePrimary && db.hello().setName === 'pawstay-demo' ? 0 : 1);
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  pet-service:
+    build: ./Backend/pet-service
+    environment:
+      <<: *service-environment
+      PORT: 3002
+      MONGODB_URI: mongodb://booking-mongodb:27017/pet_db?replicaSet=pawstay-demo
+    volumes:
+      - *public-key
+    ports:
+      - "127.0.0.1:${PET_HOST_PORT:-3002}:3002"
+    depends_on:
+      booking-mongodb:
+        condition: service_healthy
+
+  booking-service:
+    build: ./Backend/booking-service
+    command: ["sh", "-c", "node scripts/seed-resources.js && exec node server.js"]
+    environment:
+      <<: *service-environment
+      PORT: 3003
+      MONGODB_URI: mongodb://booking-mongodb:27017/booking_db?replicaSet=pawstay-demo
+      PET_BASE_URL: http://pet-service:3002
+      CATALOG_MODE: fixture
+      PAYMENT_TO_BOOKING_TOKEN: ${PAYMENT_TO_BOOKING_TOKEN:?Set PAYMENT_TO_BOOKING_TOKEN in the root .env}
+      CARE_TO_BOOKING_TOKEN: ${CARE_TO_BOOKING_TOKEN:?Set CARE_TO_BOOKING_TOKEN in the root .env}
+    volumes:
+      - *public-key
+    ports:
+      - "127.0.0.1:${BOOKING_HOST_PORT:-3003}:3003"
+    depends_on:
+      booking-mongodb:
+        condition: service_healthy
+      pet-service:
+        condition: service_healthy
+
+volumes:
+  booking_mongo_data:
