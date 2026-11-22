@@ -71,5 +71,52 @@ services:
       pet-service:
         condition: service_healthy
 
+  payment-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: payment_app
+      MYSQL_PASSWORD: ${PAYMENT_MYSQL_PASSWORD:?Set PAYMENT_MYSQL_PASSWORD in the root .env}
+      MYSQL_ROOT_PASSWORD: ${PAYMENT_MYSQL_ROOT_PASSWORD:?Set PAYMENT_MYSQL_ROOT_PASSWORD in the root .env}
+    volumes:
+      - payment_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u \"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  payment-service:
+    build: ./Backend/payment-service
+    env_file:
+      - path: ./Backend/payment-service/.env
+        required: false
+        format: raw
+    environment:
+      PAYMENT_PORT: 8084
+      PAYMENT_DB_URL: jdbc:mysql://payment-mysql:3306/payment_db?allowPublicKeyRetrieval=true
+      PAYMENT_DB_USERNAME: payment_app
+      PAYMENT_DB_PASSWORD: ${PAYMENT_MYSQL_PASSWORD:?Set PAYMENT_MYSQL_PASSWORD in the root .env}
+      AUTH_SERVICE_URL: ${AUTH_BASE_URL_DOCKER:-http://host.docker.internal:3001}
+      JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
+      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+      BOOKING_SERVICE_URL: http://booking-service:3003
+      PAYMENT_TO_BOOKING_TOKEN: ${PAYMENT_TO_BOOKING_TOKEN:?Set PAYMENT_TO_BOOKING_TOKEN in the root .env}
+    volumes:
+      - *public-key
+    ports:
+      - "127.0.0.1:${PAYMENT_HOST_PORT:-8084}:8084"
+    depends_on:
+      payment-mysql:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "true </dev/tcp/127.0.0.1/8084"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   booking_mongo_data:
+  payment_mysql_data:
