@@ -96,7 +96,9 @@ services:
       PORT: 3003
       MONGODB_URI: mongodb://booking-mongodb:27017/booking_db?replicaSet=pawstay-demo
       PET_BASE_URL: http://pet-service:3002
-      CATALOG_MODE: fixture
+      CATALOG_MODE: http
+      CATALOG_BASE_URL: http://catalog-service:3004
+      BOOKING_TO_CATALOG_TOKEN: ${BOOKING_TO_CATALOG_TOKEN:?Set BOOKING_TO_CATALOG_TOKEN in the root .env}
       PAYMENT_TO_BOOKING_TOKEN: ${PAYMENT_TO_BOOKING_TOKEN:?Set PAYMENT_TO_BOOKING_TOKEN in the root .env}
       CARE_TO_BOOKING_TOKEN: ${CARE_TO_BOOKING_TOKEN:?Set CARE_TO_BOOKING_TOKEN in the root .env}
     volumes:
@@ -158,6 +160,48 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  catalog-service:
+    build: ./Backend/catalog-service
+    command: ["sh", "-c", "node scripts/seed.js && exec node server.js"]
+    environment:
+      PORT: 3004
+      MONGODB_URI: mongodb://booking-mongodb:27017/catalog_db?replicaSet=pawstay-demo
+      AUTH_BASE_URL: http://auth-service:3001
+      JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
+      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+      BOOKING_TO_CATALOG_TOKEN: ${BOOKING_TO_CATALOG_TOKEN:?Set BOOKING_TO_CATALOG_TOKEN in the root .env}
+    volumes:
+      - *public-key
+    ports:
+      - "127.0.0.1:${CATALOG_HOST_PORT:-3004}:3004"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      booking-mongodb:
+        condition: service_healthy
+
+  care-service:
+    build: ./Backend/care-service
+    environment:
+      PORT: 3006
+      MONGODB_URI: mongodb://booking-mongodb:27017/care_db?replicaSet=pawstay-demo
+      AUTH_BASE_URL: http://auth-service:3001
+      JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
+      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+      BOOKING_BASE_URL: http://booking-service:3003
+      CARE_TO_BOOKING_TOKEN: ${CARE_TO_BOOKING_TOKEN:?Set CARE_TO_BOOKING_TOKEN in the root .env}
+    volumes:
+      - *public-key
+    ports:
+      - "127.0.0.1:${CARE_HOST_PORT:-3006}:3006"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      booking-mongodb:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
 
 volumes:
   auth_mongo_data:

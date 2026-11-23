@@ -1,0 +1,9 @@
+{
+  "name": "pawstay-care-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=22.19.0" },
+  "scripts": { "start": "node server.js", "test": "node --test --test-timeout=120000 test/service.test.js" },
+  "dependencies": { "dotenv": "18.0.10", "express": "5.3.0", "jsonwebtoken": "9.0.3", "mongoose": "9.12.2" }
+}

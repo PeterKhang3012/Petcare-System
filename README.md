@@ -1,6 +1,6 @@
 # PawStay
 
-PawStay là hệ thống đặt lịch chăm sóc và lưu trú thú cưng. Hướng dẫn này chạy Auth, Pet, Booking và Payment cùng database của chúng bằng Docker Compose.
+PawStay là hệ thống đặt lịch chăm sóc và lưu trú thú cưng. Hướng dẫn này chạy Auth, Pet, Booking, Catalog, Care và Payment cùng database của chúng bằng Docker Compose.
 
 ## 1. Chuẩn bị
 
@@ -29,9 +29,9 @@ if (-not (Test-Path Backend/payment-service/.env)) {
 }
 ```
 
-- Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền ba token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
+- Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền bốn token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
 - Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Với cổng mặc định, đặt `VNPAY_RETURN_URL=http://localhost:8084/api/payments/vnpay/return`. Khi chưa có frontend, để trống `PAYMENT_FRONTEND_RETURN_URL`. Để thử IPN thật, đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
-- Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Booking dùng danh mục mẫu để demo.
+- Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Catalog được seed idempotent khi khởi động; Booking lấy báo giá qua HTTP từ Catalog.
 
 ```powershell
 docker compose config --quiet
@@ -46,6 +46,8 @@ docker compose ps
 | Auth | `http://localhost:3001` | Đăng nhập qua `POST /api/auth/login` |
 | Pet | `http://localhost:3002` | `GET /ready` trả 200 |
 | Booking | `http://localhost:3003` | `GET /ready` trả 200 |
+| Catalog | `http://localhost:3004` | `GET /ready` trả 200 |
+| Care | `http://localhost:3006` | `GET /ready` trả 200 |
 | Payment | `http://localhost:8084` | `GET /api/payments/vnpay/return` trả 200 khi chưa có frontend |
 
 Nếu đang chạy Auth trực tiếp, dừng tiến trình đó để giải phóng cổng 3001 hoặc đặt `AUTH_HOST_PORT` khác. Nếu cổng khác bị chiếm, đổi `PET_HOST_PORT`, `BOOKING_HOST_PORT` hoặc `PAYMENT_HOST_PORT` trong `.env` gốc và cập nhật URL tương ứng trong Postman. Khi đổi cổng Payment, cập nhật cả `VNPAY_RETURN_URL`.
@@ -60,3 +62,5 @@ docker compose down
 ```
 
 `docker compose down` giữ dữ liệu trong các volume.
+
+Hướng dẫn API, đổi giá, tiếp nhận/nhật ký/bàn giao và kiểm thử: [Catalog và Care](docs/catalog-care.md).
