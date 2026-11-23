@@ -2,6 +2,8 @@
 
 ## 1. Khởi động
 
+Nếu dùng Docker Compose, làm theo [README gốc](../../README.md) và đặt cả bốn biến URL của Postman thành `http://localhost:8080` hoặc URL gateway đã cấu hình. Các bước dưới đây dùng khi chạy từng service trực tiếp.
+
 - Chạy MongoDB dành cho Auth/Pet và replica set ghi được cho Booking. Tạo schema MySQL 8.4 riêng `payment_db`.
 - Mở terminal riêng tại từng thư mục service. Chạy `npm start` cho Auth và Pet. Tại Booking, chạy `npm run seed` rồi `npm start`. Nếu chưa có dependencies, cài bằng `npm ci` trước.
 - Khi chưa có Catalog, cấu hình rõ `CATALOG_MODE=fixture` trong Booking local để dùng dịch vụ mẫu `bath` hoặc `boarding`. Fixture chỉ phục vụ demo.
