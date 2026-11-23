@@ -1,0 +1,14 @@
+# Dùng với project Compose kiểm thử riêng và ảnh đã build từ stack local.
+services:
+  auth-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-auth-service:latest
+  pet-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-pet-service:latest
+  booking-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-booking-service:latest
+  payment-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-payment-service:latest
+    environment:
+      VNPAY_TMN_CODE: ${PAWSTAY_TEST_VNPAY_TMN:-TEST}
+      VNPAY_HASH_SECRET: ${PAWSTAY_TEST_VNPAY_SECRET:?Set a test-only key}
+      PAYMENT_FRONTEND_RETURN_URL: ""
