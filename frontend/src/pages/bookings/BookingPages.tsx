@@ -1,17 +1,17 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BookingDetails, BookingList } from '../../components/BookingList';
 import { useLoad } from '../../hooks/useLoad';
 import { bookings, payments, pets } from '../../services';
+import { bookingServices } from '../../services/catalog';
 import { Empty, Feedback, HistoryList, Pagination, Status } from '../../UI/Feedback';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Booking, BookingInput, Quote } from '../../types';
-import { dateTime, facilityTime, label, money, serviceName } from '../../utils/format';
+import { dateTime, facilityTime, label, money } from '../../utils/format';
 import { knownPayment, paymentKey, rememberPayment } from '../../utils/paymentStorage';
 import { isAxiosError } from 'axios';
 
 const states = ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'EXPIRED'];
-const serviceIds = [...new Set((import.meta.env.VITE_SERVICE_IDS || 'bath,boarding').split(',').map((value: string) => value.trim()).filter(Boolean))] as string[];
 
 export function BookingsPage() {
   const [page, setPage] = useState(1);
@@ -28,14 +28,18 @@ export function BookingsPage() {
 export function BookingNew() {
   const [petPage, setPetPage] = useState(1);
   const petList = useLoad(useCallback(() => pets.list(petPage), [petPage]));
-  const [serviceId, setServiceId] = useState(serviceIds[0] ?? '');
-  const [mode, setMode] = useState('care');
+  const catalog = useLoad(bookingServices);
+  const [search] = useSearchParams();
+  const [selection, setSelection] = useState('');
+  const services = catalog.data ?? [];
+  const selected = services.find(service => service.service_id === (selection || search.get('service'))) ?? services[0];
+  const serviceId = selected?.service_id ?? '';
   const [review, setReview] = useState<{ input: BookingInput; quote: Quote; available: number; key: string }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const retryKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const navigate = useNavigate();
-  const boarding = serviceId === 'boarding' || (serviceId !== 'bath' && mode === 'boarding');
+  const boarding = selected?.type === 'BOARDING';
   async function quote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -64,16 +68,16 @@ export function BookingNew() {
     } finally { setBusy(false); }
   }
   return <><Link to="/bookings">Danh sách lịch đặt</Link><h1>Đặt lịch chăm sóc</h1>
+    <Feedback {...catalog} retry={catalog.reload}>{catalog.data && (!services.length ? <Empty>Chưa có dịch vụ đang hoạt động.</Empty> :
     <Feedback {...petList} retry={petList.reload}>{petList.data && (petList.data.pets.length ? <>
       <form className="panel form-grid" onSubmit={quote} onChange={() => { setReview(undefined); setError(undefined); }} key={petPage}>
         <label>Thú cưng<select name="pet" required><option value="">Chọn thú cưng</option>{petList.data.pets.map(pet => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>
-        <label>Dịch vụ<select value={serviceId} onChange={event => setServiceId(event.target.value)} required>{serviceIds.map(id => <option key={id} value={id}>{serviceName(id)}</option>)}</select></label>
-        {!['bath', 'boarding'].includes(serviceId) && <label>Loại lịch<select value={mode} onChange={event => setMode(event.target.value)}><option value="care">Chăm sóc theo giờ</option><option value="boarding">Lưu trú theo ngày</option></select></label>}
+        <label>Dịch vụ<select value={serviceId} onChange={event => setSelection(event.target.value)} required>{services.map(service => <option key={service.service_id} value={service.service_id}>{service.name}</option>)}</select></label>
         {boarding ? <><label>Ngày nhận thú cưng<input type="date" name="checkIn" required/></label><label>Ngày trả thú cưng<input type="date" name="checkOut" required/></label></> :
           <label>Thời gian bắt đầu (GMT+7)<input type="datetime-local" name="start" required/></label>}
         <div className="full"><button disabled={busy}>Kiểm tra chỗ và báo giá</button></div>
       </form><Pagination result={petList.data} change={page => { setPetPage(page); setReview(undefined); }}/></> :
-      <Empty>Hãy <Link to="/pets/new">thêm thú cưng</Link> trước khi đặt lịch.</Empty>)}</Feedback>
+      <Empty>Hãy <Link to="/pets/new">thêm thú cưng</Link> trước khi đặt lịch.</Empty>)}</Feedback>)}</Feedback>
     <Feedback error={error} loading={busy}/>
     {review && <section className="panel"><h2>Báo giá</h2><p className="amount">{money(review.quote.total_amount, review.quote.currency)}</p>
       <p>{dateTime(review.quote.start_at)} – {dateTime(review.quote.end_at)}</p><p>{review.available ? `Hiện có ${review.available} chỗ phù hợp. Chỗ được giữ sau khi đặt lịch thành công.` : 'Hiện không còn chỗ phù hợp.'}</p>

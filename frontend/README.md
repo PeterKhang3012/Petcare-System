@@ -1,6 +1,6 @@
 # PawStay Frontend
 
-Giao diện React, TypeScript và Vite để sử dụng hệ thống PawStay qua Nginx API Gateway. Giao diện khách hàng hỗ trợ hồ sơ thú cưng, đặt lịch và thanh toán. Tài khoản STAFF dùng trang lịch vận hành và tài nguyên.
+Giao diện React, TypeScript và Vite để sử dụng hệ thống PawStay qua Nginx API Gateway. Khách hàng có thể xem danh mục, đặt lịch, thanh toán và theo dõi hồ sơ chăm sóc của mình. STAFF quản lý lịch vận hành và tài nguyên, tiếp nhận, ghi nhật ký và bàn giao thú cưng. STAFF có quyền `UPDATE_SERVICE_PRICE` có thể cập nhật giá dịch vụ.
 
 Chạy Docker Compose từ thư mục gốc, sau đó chạy `npm ci` và `npm run dev` từ `frontend/`. Mở `http://localhost:5173`.
 

@@ -6,6 +6,10 @@ services:
     image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-pet-service:latest
   booking-service:
     image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-booking-service:latest
+  catalog-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-catalog-service:latest
+  care-service:
+    image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-care-service:latest
   payment-service:
     image: ${PAWSTAY_TEST_IMAGE_PREFIX:-petcaresystem}-payment-service:latest
     environment:

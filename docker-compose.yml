@@ -113,6 +113,8 @@ services:
         condition: service_healthy
       pet-service:
         condition: service_healthy
+      catalog-service:
+        condition: service_healthy
 
   payment-mysql:
     image: mysql:8.4
@@ -161,7 +163,6 @@ services:
       timeout: 3s
       retries: 20
 
-<<<<<<< HEAD
   catalog-service:
     build: ./Backend/catalog-service
     command: ["sh", "-c", "node scripts/seed.js && exec node server.js"]
@@ -170,12 +171,10 @@ services:
       MONGODB_URI: mongodb://booking-mongodb:27017/catalog_db?replicaSet=pawstay-demo
       AUTH_BASE_URL: http://auth-service:3001
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
-      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+      JWT_PUBLIC_KEY_PATH: /app/public-keys/auth-public.pem
       BOOKING_TO_CATALOG_TOKEN: ${BOOKING_TO_CATALOG_TOKEN:?Set BOOKING_TO_CATALOG_TOKEN in the root .env}
     volumes:
-      - *public-key
-    ports:
-      - "127.0.0.1:${CATALOG_HOST_PORT:-3004}:3004"
+      - *public-keys
     depends_on:
       auth-service:
         condition: service_healthy
@@ -189,13 +188,11 @@ services:
       MONGODB_URI: mongodb://booking-mongodb:27017/care_db?replicaSet=pawstay-demo
       AUTH_BASE_URL: http://auth-service:3001
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
-      JWT_PUBLIC_KEY_PATH: /app/keys/auth-public.pem
+      JWT_PUBLIC_KEY_PATH: /app/public-keys/auth-public.pem
       BOOKING_BASE_URL: http://booking-service:3003
       CARE_TO_BOOKING_TOKEN: ${CARE_TO_BOOKING_TOKEN:?Set CARE_TO_BOOKING_TOKEN in the root .env}
     volumes:
-      - *public-key
-    ports:
-      - "127.0.0.1:${CARE_HOST_PORT:-3006}:3006"
+      - *public-keys
     depends_on:
       auth-service:
         condition: service_healthy
@@ -203,29 +200,31 @@ services:
         condition: service_healthy
       booking-service:
         condition: service_healthy
-=======
-  api-gateway:
-    image: nginx:1.28-alpine
-    ports:
-      - "127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080"
-    volumes:
-      - ./gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      auth-service:
-        condition: service_healthy
-      pet-service:
-        condition: service_healthy
-      booking-service:
-        condition: service_healthy
-      payment-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
->>>>>>> 8f56677fe85c37c99f437d700a5a4be923a3f63d
 
+  api-gateway:
+      image: nginx:1.28-alpine
+      ports:
+        - "127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080"
+      volumes:
+        - ./gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
+      depends_on:
+        auth-service:
+          condition: service_healthy
+        pet-service:
+          condition: service_healthy
+        booking-service:
+          condition: service_healthy
+        payment-service:
+          condition: service_healthy
+        catalog-service:
+          condition: service_healthy
+        care-service:
+          condition: service_healthy
+      healthcheck:
+        test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+        interval: 5s
+        timeout: 3s
+        retries: 10
 volumes:
   jwt_public_keys:
   auth_mongo_data:

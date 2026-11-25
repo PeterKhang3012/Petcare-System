@@ -33,6 +33,9 @@ export function errorMessage(error: unknown) {
   if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
   if (status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
   if (status === 409 && data?.code === 'PRICE_CHANGED') return 'Giá đã thay đổi. Hãy yêu cầu báo giá mới trước khi đặt lịch.';
+  if (status === 409 && data?.code === 'PRICE_VERSION_CONFLICT') return 'Giá vừa được thay đổi. Hãy tải lại giá hiện tại trước khi cập nhật.';
+  if (status === 409 && data?.code === 'LOG_VERSION_CONFLICT') return 'Nhật ký vừa được chỉnh sửa. Hãy tải lại phiên bản mới nhất.';
+  if (status === 409 && data?.code === 'SYNC_IN_PROGRESS') return 'Đã có yêu cầu đang đồng bộ. Hãy xem trạng thái trong hồ sơ chăm sóc.';
   if (status === 409) return 'Thao tác xung đột với dữ liệu hiện tại. Hãy kiểm tra lại trạng thái.';
   if (status >= 500) return 'Dịch vụ tạm thời không phản hồi. Vui lòng thử lại sau.';
   return 'Yêu cầu không hợp lệ. Vui lòng kiểm tra thông tin đã nhập.';

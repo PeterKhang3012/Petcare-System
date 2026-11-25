@@ -6,7 +6,19 @@ const { supportsTransactions } = require('../src/transactions');
 const resources = Object.freeze([
   { code: 'CARE-01', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
   { code: 'CARE-02', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-03', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-04', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-05', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-06', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-07', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
+  { code: 'CARE-08', group: 'CARE', species: ['DOG', 'CAT'], max_weight_kg: 40 },
   { code: 'STAY-DOG-01', group: 'BOARDING', species: ['DOG'], max_weight_kg: 40 },
+  { code: 'STAY-DOG-02', group: 'BOARDING', species: ['DOG'], max_weight_kg: 40 },
+  { code: 'STAY-DOG-03', group: 'BOARDING', species: ['DOG'], max_weight_kg: 40 },
+  { code: 'STAY-DOG-04', group: 'BOARDING', species: ['DOG'], max_weight_kg: 40 },
+  { code: 'STAY-CAT-02', group: 'BOARDING', species: ['CAT'], max_weight_kg: 20 },
+  { code: 'STAY-CAT-03', group: 'BOARDING', species: ['CAT'], max_weight_kg: 20 },
+  { code: 'STAY-CAT-04', group: 'BOARDING', species: ['CAT'], max_weight_kg: 20 },
   { code: 'STAY-CAT-01', group: 'BOARDING', species: ['CAT'], max_weight_kg: 20 }
 ]);
 async function seed(models) {

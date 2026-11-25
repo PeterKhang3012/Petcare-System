@@ -8,6 +8,7 @@ export const labels: Record<string, string> = {
   PENDING: 'Đang chờ', SUCCEEDED: 'Thành công', FAILED: 'Thất bại',
   DELIVERED: 'Đã đồng bộ', REJECTED: 'Booking từ chối',
   DEAD_LETTER: 'Đã dừng thử đồng bộ',
+  IN_CARE: 'Đang chăm sóc', SYNCED: 'Đã đồng bộ',
   READY: 'Sẵn sàng', OCCUPIED: 'Đang sử dụng', CLEANING: 'Đang vệ sinh',
   OUT_OF_SERVICE: 'Ngừng phục vụ', CARE: 'Chăm sóc', BOARDING: 'Lưu trú',
   SCHEDULED: 'Đã lên lịch', CREATED: 'Đã tạo lịch', CLEANING_COMPLETED: 'Hoàn tất vệ sinh',

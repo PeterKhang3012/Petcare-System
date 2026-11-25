@@ -41,4 +41,15 @@ Các route business trong bảng đã có giao diện. Return và IPN do Payment
 | GET `/internal/care/requests/:requestId` | Care → Booking | Trả `data.request_id,result`; 403/404 |
 | GET `/live`, `/ready` | Nội bộ Pet và Booking | Trạng thái sống và khả năng phục vụ; readiness có thể trả 503 |
 
-Nguồn chi tiết: [Pet OpenAPI](../../Backend/pet-service/openapi.json), [Booking OpenAPI](../../Backend/booking-service/openapi.json), [Auth routes](../../Backend/auth-service/src/routes/auth.routes.js) và [Payment controllers](../../Backend/payment-service/src/main/java/com/pawstay/payment/controller/). Chưa có API danh mục công khai, tra cứu danh sách Payment theo tài khoản, đổi thông tin tài khoản, CRUD tài khoản STAFF hoặc API khách thao tác check-in/out.
+## Catalog và Care
+
+| API | Quyền và mục đích |
+| --- | --- |
+| GET `/api/catalog/services`, GET `/api/catalog/services/:id` | USER và STAFF xem danh mục, lọc loại dịch vụ hoặc loài, xem giá hiện tại. |
+| GET `/api/catalog/services/:id/price-history` | STAFF xem lịch sử giá. |
+| PATCH `/api/catalog/services/:id/price` | STAFF có `UPDATE_SERVICE_PRICE` gửi giá, lý do và phiên bản giá hiện tại. |
+| GET `/api/care/visits`, `/visits/:id`, `/visits/:id/logs`, `/requests/:id` dưới `/api/care` | STAFF đọc hồ sơ vận hành, USER đọc hồ sơ của mình. |
+| POST `/api/care/bookings/:id/check-in` hoặc `/check-out` | STAFF tiếp nhận hoặc bàn giao, gửi `request_id` để có thể thử lại an toàn. |
+| POST `/api/care/visits/:id/logs`, PATCH `/api/care/visits/:id/logs/:logId` | STAFF thêm nhật ký với `request_id`, hoặc sửa kèm lý do và `expected_version`. |
+
+Nguồn chi tiết: [Pet OpenAPI](../../Backend/pet-service/openapi.json), [Booking OpenAPI](../../Backend/booking-service/openapi.json), [Catalog routes](../../Backend/catalog-service/src/app.js), [Care routes](../../Backend/care-service/src/app.js), [Auth routes](../../Backend/auth-service/src/routes/auth.routes.js) và [Payment controllers](../../Backend/payment-service/src/main/java/com/pawstay/payment/controller/). Chưa có API tra cứu danh sách Payment theo tài khoản, đổi thông tin tài khoản hoặc CRUD tài khoản STAFF.

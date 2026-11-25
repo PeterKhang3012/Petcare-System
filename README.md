@@ -26,11 +26,8 @@ if (-not (Test-Path Backend/payment-service/.env)) {
 ```
 
 - Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền bốn token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
-- Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Với cổng mặc định, đặt `VNPAY_RETURN_URL=http://localhost:8084/api/payments/vnpay/return`. Khi chưa có frontend, để trống `PAYMENT_FRONTEND_RETURN_URL`. Để thử IPN thật, đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
 - Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Catalog được seed idempotent khi khởi động; Booking lấy báo giá qua HTTP từ Catalog.
-- Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền ba token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
 - Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Khi chưa có frontend, để trống `PAYMENT_FRONTEND_RETURN_URL`. Compose mặc định dùng `http://localhost:8080/api/payments/vnpay/return`. Khi triển khai qua HTTPS, đặt `VNPAY_RETURN_URL` trong **`.env` gốc** và đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
-- Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Booking dùng danh mục mẫu để demo.
 
 ```powershell
 docker compose config --quiet
@@ -60,6 +57,8 @@ Docker chỉ publish cổng gateway trên loopback. Dùng `http://localhost:8080
 | `/api/pets` | Pet |
 | `/api/bookings`, `/api/staff` | Booking |
 | `/api/payments`, gồm Return và IPN | Payment |
+| `/api/catalog` | Catalog |
+| `/api/care` | Care |
 
 Các endpoint `/internal/*` dùng mạng Docker. Compose hiện sử dụng danh mục Booking mẫu cho demo.
 

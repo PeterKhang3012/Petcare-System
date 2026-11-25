@@ -8,6 +8,8 @@ import { PetDetail, PetList, PetNew } from './pages/pets/PetPages';
 import { BookingNew, BookingPage, BookingsPage } from './pages/bookings/BookingPages';
 import { PaymentLookup, PaymentPage } from './pages/payments/PaymentPages';
 import { StaffBooking, StaffPage } from './pages/staff/StaffPages';
+import { CatalogDetail, CatalogPage } from './pages/catalog/CatalogPages';
+import { CarePage, CareRequestPage, CareVisit } from './pages/care/CarePages';
 import type { Role } from './types';
 
 function Protected({ role }: { role?: Role }) {
@@ -30,6 +32,9 @@ export default function App() {
     <Route path="/login" element={<PublicAuth/>}/><Route path="/register" element={<PublicAuth register/>}/>
     <Route element={<Protected/>}><Route element={<Layout/>}>
       <Route index element={<Dashboard/>}/><Route path="profile" element={<Profile/>}/>
+      <Route path="catalog" element={<CatalogPage/>}/><Route path="catalog/:id" element={<CatalogDetail/>}/>
+      <Route path="care" element={<CarePage/>}/><Route path="care/visits/:id" element={<CareVisit/>}/>
+      <Route path="care/requests/:id" element={<CareRequestPage/>}/>
       <Route element={<Protected role="USER"/>}>
         <Route path="pets" element={<PetList/>}/><Route path="pets/new" element={<PetNew/>}/><Route path="pets/:id" element={<PetDetail/>}/>
         <Route path="bookings" element={<BookingsPage/>}/><Route path="bookings/new" element={<BookingNew/>}/><Route path="bookings/:id" element={<BookingPage/>}/>
