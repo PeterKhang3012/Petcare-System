@@ -10,6 +10,7 @@ public record PaymentResponse(
         @JsonProperty("booking_id") String bookingId,
         long amount, String currency, String status,
         @JsonProperty("expires_at") Instant expiresAt,
+        @JsonProperty("verified_at") Instant verifiedAt,
         @JsonProperty("payment_url") String paymentUrl,
         @JsonProperty("booking_sync_status") String bookingSyncStatus,
         @JsonProperty("booking_sync_outcome") String bookingSyncOutcome) {

@@ -1,8 +1,8 @@
 # Tích hợp VNPay
 
 1. Frontend gửi `booking_id` và `Idempotency-Key`. Payment lấy chủ sở hữu, số tiền và hạn giữ chỗ từ Booking. Backend tạo một attempt MySQL và sinh URL ký HMAC-SHA512.
-2. Giao diện hiển thị URL từ POST Payment và mở VNPay ở tab mới. Trang theo dõi đọc GET Payment. GET không trả URL; để lấy lại liên kết của giao dịch do thiết bị này tạo, frontend gọi lại POST bằng cùng khóa.
-3. Return cho trình duyệt có thể chuyển hướng đến `/payments/return` nếu quản trị viên cấu hình `PAYMENT_FRONTEND_RETURN_URL` phù hợp. Trang đó cho tra mã giao dịch và liên kết giao dịch gần nhất đã lưu.
+2. Giao diện mở VNPAY trong cùng tab để giữ phiên đăng nhập khi quay lại frontend. Để lấy lại liên kết của giao dịch do thiết bị này tạo, frontend gọi lại POST Payment bằng cùng khóa.
+3. Return chuyển hướng đến `/payments/return` kèm mã tra cứu giao dịch. Compose mặc định dùng `http://localhost:5173/payments/return`. Nếu frontend chạy ở origin khác, đặt `PAYMENT_FRONTEND_RETURN_URL` trong `.env` gốc cùng origin đăng nhập. Biên nhận xuất hiện sau khi GET Payment của chủ giao dịch trả trạng thái `SUCCEEDED`.
 4. IPN xác minh chữ ký, mã merchant, tham chiếu, số tiền và mã giao dịch. Payment và Outbox ghi trong cùng giao dịch MySQL. Worker gửi sự kiện đến Booking; Booking xác minh lại số tiền, thời hạn và ghi chuyển trạng thái.
 5. Giao diện hiển thị các trạng thái Payment và đồng bộ Booking độc lập. Trạng thái trên URL Return không được dùng để ghi hoặc xác nhận thanh toán.
 

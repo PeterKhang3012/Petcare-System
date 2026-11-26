@@ -1,6 +1,16 @@
 import { api, data, pathId } from '../api/client';
 import type { Page } from '../types';
 
+export interface PriceRule {
+  price_rule_id: string;
+  species: 'DOG' | 'CAT';
+  coat_type?: 'SHORT' | 'LONG';
+  min_weight_kg: number;
+  max_weight_kg: number;
+  max_inclusive?: boolean;
+  unit_price: number;
+}
+
 export interface CatalogService {
   service_id: string;
   name: string;
@@ -12,10 +22,12 @@ export interface CatalogService {
   duration_minutes: number | null;
   price_version_id: string;
   unit_price: number;
+  price_rules?: PriceRule[];
   currency: string;
 }
 
 interface PriceVersion {
+  price_rule_id?: string;
   price_version_id: string;
   currency: string;
   unit_price: number;
@@ -30,7 +42,7 @@ export const catalog = {
   get: (id: string) => data<{ service: CatalogService }>(api.get('/catalog/services/' + pathId(id))),
   history: (id: string, page: number) =>
     data<Page & { history: PriceVersion[] }>(api.get('/catalog/services/' + pathId(id) + '/price-history', { params: { page } })),
-  update: (id: string, input: { unit_price: number; reason: string; expected_price_version: string }) =>
+  update: (id: string, input: { unit_price: number; reason: string; expected_price_version: string; price_rule_id?: string }) =>
     data<{ price: PriceVersion }>(api.patch('/catalog/services/' + pathId(id) + '/price', input)),
 };
 

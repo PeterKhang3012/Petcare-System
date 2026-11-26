@@ -6,10 +6,10 @@ router.get(
   "/me",
   require("../middleware/auth.middleware").authenticate,
   (req, res) => {
-    const { id, username, role, permissions } = req.user;
+    const { id, username, role, permissions, full_name, phone } = req.user;
     res.json({
       success: true,
-      data: { user: { id, username, role, permissions } },
+      data: { user: { id, username, role, permissions, full_name, phone } },
     });
   },
 );

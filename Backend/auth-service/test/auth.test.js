@@ -20,6 +20,7 @@ test('register/login, seed, JWT and authorization', async t => {
  process.env.JWT_PRIVATE_KEY_PATH = path.join(dir, 'private.pem');
  process.env.JWT_PUBLIC_KEY_PATH = path.join(dir, 'public.pem');
  process.env.JWT_ISSUER = 'test-auth';
+ process.env.FACILITY_CONTACT_FILE = path.join(dir, 'facility.json');
  const rows = new Map();
  t.mock.method(Auth, 'findById', async id => [...rows.values()].find(row => row._id === id) || null);
  t.mock.method(Auth, 'exists', async ({ username }) => rows.has(username));
@@ -49,20 +50,39 @@ test('register/login, seed, JWT and authorization', async t => {
   return { status: res.status, body: await res.json() };
  };
  try {
-  const credentials = { username: ' alice ', password: 'password123', role: 'STAFF', permissions: ['UPDATE_SERVICE_PRICE'] };
+  const credentials = { username: ' alice ', password: 'password123', confirm_password: 'password123', full_name: ' Nguyễn An ', phone: ' 0912345678 ', role: 'STAFF', permissions: ['UPDATE_SERVICE_PRICE'] };
+  for (const field of ['full_name', 'phone']) {
+   for (const value of [undefined, ' ', 123]) {
+    assert.equal((await post('register', { ...credentials, [field]: value })).status, 400);
+   }
+  }
+  for (const confirm_password of [undefined, '', 'Password123']) {
+   assert.equal((await post('register', { ...credentials, confirm_password })).status, 400);
+  }
+  assert.equal(rows.size, 0);
   const registered = await post('register', credentials);
   assert.equal(registered.status, 201);
   assert.equal(registered.body.data.user.role, 'USER');
   assert.deepEqual(registered.body.data.user.permissions, []);
   assert.equal(JSON.stringify(registered.body).includes('password'), false);
   assert.notEqual(rows.get('alice').password, credentials.password);
+  assert.equal(rows.get('alice').full_name, 'Nguyễn An');
+  assert.equal(rows.get('alice').phone, '0912345678');
+  assert.equal('confirm_password' in rows.get('alice'), false);
   assert.ok(await bcrypt.compare(credentials.password, rows.get('alice').password));
   assert.equal((await post('register', credentials)).status, 409);
   assert.equal((await post('register', { username: {}, password: 'x' })).status, 400);
   assert.equal((await post('register', { username: 'bad', password: 'a'.repeat(73) })).status, 400);
-  const normal = await post('login', credentials);
+  const normal = await post('login', { username: credentials.username, password: credentials.password });
   assert.equal(normal.status, 200);
   const payload = require('../src/config/jwt').verifyToken(normal.body.data.accessToken);
+  assert.equal(normal.body.data.user.full_name, 'Nguyễn An');
+  assert.equal(normal.body.data.user.phone, '0912345678');
+  assert.equal('full_name' in payload, false);
+  assert.equal('phone' in payload, false);
+  const ownerMe = await fetch(base + '/api/auth/me', { headers: { Authorization: 'Bearer ' + normal.body.data.accessToken } });
+  assert.equal(ownerMe.status, 200);
+  assert.deepEqual((await ownerMe.json()).data.user, normal.body.data.user);
   assert.equal(payload.role, 'USER');
   assert.equal(payload.sub, registered.body.data.user.id);
   assert.ok(payload.exp > payload.iat);
@@ -89,12 +109,27 @@ test('register/login, seed, JWT and authorization', async t => {
   const pricing = await post('login', { username: 'pricing', password: 'staffpassword' });
   assert.deepEqual(require('../src/config/jwt').verifyToken(pricing.body.data.accessToken).permissions, ['UPDATE_SERVICE_PRICE']);
   assert.equal((await changePrice(pricing.body.data.accessToken)).status, 200);
+  const contact = (token, body) => fetch(base + '/api/facility/contact', {
+   method: body ? 'PUT' : 'GET',
+   headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+   body: body && JSON.stringify(body),
+  });
+  const change = { hotline: '09000001', address: '  12 Đường Mẫu  ' };
+  const initialContact = await contact(normal.body.data.accessToken);
+  assert.deepEqual((await initialContact.json()).data, { hotline: '09000000', address: '', can_edit: false });
+  assert.equal((await contact(normal.body.data.accessToken, change)).status, 403);
+  assert.equal((await contact(staff.body.data.accessToken, change)).status, 403);
+  assert.equal((await contact(pricing.body.data.accessToken, { ...change, hotline: 'abc' })).status, 400);
+  assert.equal((await contact(pricing.body.data.accessToken, change)).status, 200);
+  assert.deepEqual(JSON.parse(fs.readFileSync(process.env.FACILITY_CONTACT_FILE, 'utf8')), { hotline: '09000001', address: '12 Đường Mẫu' });
+  assert.deepEqual((await (await contact(staff.body.data.accessToken)).json()).data, { hotline: '09000001', address: '12 Đường Mẫu', can_edit: false });
   await assert.rejects(seedStaff('pricing', 'staffpassword'), /permissions differ/);
   await assert.rejects(seedStaff('invalid', 'staffpassword', ['ADMIN']), /Invalid permissions/);
   const me = await fetch(base + '/api/auth/me', { headers: { Authorization: 'Bearer ' + pricing.body.data.accessToken } });
   assert.equal(me.status, 200);
   assert.deepEqual((await me.json()).data.user.permissions, ['UPDATE_SERVICE_PRICE']);
   rows.get('pricing').permissions = [];
+  assert.equal((await contact(pricing.body.data.accessToken, change)).status, 403);
   assert.equal((await changePrice(pricing.body.data.accessToken)).status, 403);
   rows.delete('pricing');
   assert.equal((await changePrice(pricing.body.data.accessToken)).status, 401);
@@ -113,11 +148,11 @@ test('register/login, seed, JWT and authorization', async t => {
   assert.equal(allowed, true);
   t.mock.method(Auth, 'exists', async () => false);
   t.mock.method(Auth, 'create', async () => { throw Object.assign(new Error('race'), { code: 11000 }); });
-  await assert.rejects(require('../src/services/auth.service').register('race', 'password123'), { status: 409 });
+  await assert.rejects(require('../src/services/auth.service').register({ ...credentials, username: 'race' }), { status: 409 });
  } finally {
   await Promise.all([new Promise(r => server.close(r)), new Promise(r => protectedServer.close(r))]);
   fs.rmSync(dir, { recursive: true, force: true });
-  for (const name of ['JWT_PRIVATE_KEY_PATH', 'JWT_PUBLIC_KEY_PATH', 'JWT_ISSUER']) {
+  for (const name of ['JWT_PRIVATE_KEY_PATH', 'JWT_PUBLIC_KEY_PATH', 'JWT_ISSUER', 'FACILITY_CONTACT_FILE']) {
    if (previousEnv[name] === undefined) delete process.env[name]; else process.env[name] = previousEnv[name];
   }
  }

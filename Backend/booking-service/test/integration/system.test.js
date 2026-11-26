@@ -81,7 +81,7 @@ test('Pet and Booking on authenticated real MongoDB replica set with two Booking
     fakes.accounts.get(users.aliceId).role = 'USER';
   });
   await t.test('quotes/availability hold nothing, reject injection, wrong owner and stale price', async () => {
-    const p = await newPet(), input = careInput(p.id, 2, '12:00'), before = await db.collection('bookings').countDocuments();
+    const p = await newPet(), input = careInput(p.id, 2, '11:00'), before = await db.collection('bookings').countDocuments();
     const quoted = await api('/api/bookings/quotes', { method: 'POST', body: input }); assert.equal(quoted.status, 200); assert.equal(quoted.body.data.quote.duration_minutes, 60);
     const available = await api('/api/bookings/availability?' + new URLSearchParams(input)); assert.equal(available.status, 200); assert.equal(available.body.data.holds_resource, false);
     assert.equal(JSON.stringify(available.body).includes('owner_id'), false);
@@ -123,7 +123,7 @@ test('Pet and Booking on authenticated real MongoDB replica set with two Booking
     const results = await Promise.all(group.map((p, i) => create(careInput(p.id, 5), randomUUID(), i % 2 ? first : second)));
     assert.equal(results.filter(r => r.status === 201).length, 2, JSON.stringify(results.map(r => r.body)));
     assert.ok(results.every(r => [201, 409].includes(r.status)));
-    const allocations = await db.collection('allocations').find({ type: 'BOOKING', start_at: new Date('2030-01-05T01:45:00Z') }).toArray();
+    const allocations = await db.collection('allocations').find({ type: 'BOOKING', start_at: new Date('2030-01-05T02:00:00Z') }).toArray();
     assert.equal(allocations.length, 2); assert.equal(new Set(allocations.map(a => String(a.resource_id))).size, 2);
   });
   await t.test('two processes cannot overlap one pet across different resources', async () => {
@@ -132,11 +132,11 @@ test('Pet and Booking on authenticated real MongoDB replica set with two Booking
     assert.equal(results.filter(r => r.status === 201).length, 1);
     assert.ok(results.filter(r => r.status !== 201).every(r => r.body.code === 'PET_TIME_CONFLICT'));
   });
-  await t.test('half-open allocation boundaries include preparation and cleaning buffer', async () => {
+  await t.test('consecutive care slots share a resource without overlap', async () => {
     const careResources = resources.filter(r => r.group === 'CARE');
     assert.equal((await staff(`/resources/${careResources[1].id}/maintenance`, { method: 'POST', body: { start_at: '2030-01-07T08:00:00+07:00', end_at: '2030-01-07T18:00:00+07:00', reason: 'Only one operational bay for boundary test' } })).status, 201);
-    const one = await newBooking(7, '10:00'), two = await newBooking(7, '11:45'); assert.equal(one.resource_id, two.resource_id);
-    const conflict = await create(careInput((await newPet()).id, 7, '11:30')); assert.equal(conflict.status, 409); assert.equal(conflict.body.code, 'SLOT_UNAVAILABLE');
+    const one = await newBooking(7, '10:00'), two = await newBooking(7, '11:00'); assert.equal(one.resource_id, two.resource_id);
+    const conflict = await create(careInput((await newPet()).id, 7, '11:00')); assert.equal(conflict.status, 409); assert.equal(conflict.body.code, 'SLOT_UNAVAILABLE');
   });
   await t.test('maintenance and creation race use the same resource write guard', async () => {
     const p = await newPet('DOG'), r = resources.find(r => r.code === 'STAY-DOG-01');
@@ -210,7 +210,7 @@ test('Pet and Booking on authenticated real MongoDB replica set with two Booking
     await time('2030-01-01T02:00:00Z');
   });
   await t.test('Care persistent requests, actual state, seed preservation and cleaning buffer', async () => {
-    const b = await newBooking(24), next = await newBooking(24, '10:45'); await payment(b); await payment(next);
+    const b = await newBooking(24), next = await newBooking(24, '10:00'); await payment(b); await payment(next);
     assert.equal(b.resource_id, next.resource_id);
     assert.equal((await care('check-in', b)).status, 409); // beyond even the test early window
     await time('2030-01-24T02:00:00Z');

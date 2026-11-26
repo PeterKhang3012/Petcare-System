@@ -1,4 +1,4 @@
-const { baseApp, finishApp, authenticate, requireRole, internalAuth, id, object, pagination, requestKey, fail, invalid, timestamp } = require('./platform');
+const { baseApp, finishApp, authenticate, requireRole, internalAuth, id, object, pagination, requestKey, fail, invalid, timestamp, dateOnly } = require('./platform');
 const { createModels, present } = require('./models');
 const { adapters } = require('./adapters');
 const { supportsTransactions } = require('./transactions');
@@ -29,6 +29,12 @@ function createApp({ config, connection, logger, clock, clients = adapters(confi
   app.use('/api/bookings', requireRole('USER'));
   app.post('/api/bookings/quotes', async (req, res) => res.json({ success: true, data: { quote: service.quoteView(await service.prepare(bookingInput(req.body), req.user.id, req.correlationId)) } }));
   app.get('/api/bookings/availability', async (req, res) => {
+    if (req.query.date !== undefined) {
+      object(req.query, ['date', 'pet_id', 'service_id']);
+      const date = dateOnly(req.query.date, 'date');
+      const input = bookingInput({ pet_id: req.query.pet_id, service_id: req.query.service_id, start_at: `${date}T08:00:00+07:00` });
+      return res.json({ success: true, data: await service.dailyAvailability(date, input, req.user.id, req.correlationId) });
+    }
     const prepared = await service.prepare(bookingInput(req.query), req.user.id, req.correlationId);
     res.json({ success: true, data: await service.availability(prepared) });
   });
@@ -52,6 +58,13 @@ function createApp({ config, connection, logger, clock, clients = adapters(confi
     const effective = [];
     for (const booking of bookings) effective.push(present(await service.get(booking._id, req.user.id)));
     res.json({ success: true, data: { bookings: effective, page, limit, total } });
+  });
+  app.get('/api/bookings/pet-statuses', async (req, res) => {
+    object(req.query, ['pet_ids']);
+    const values = typeof req.query.pet_ids === 'string' ? req.query.pet_ids.split(',') : [];
+    if (!values.length || values.length > 20) invalid('Provide 1 to 20 pet IDs');
+    const petIds = values.map(value => id(value, 'pet_ids'));
+    res.json({ success: true, data: { statuses: await service.petBookingStatuses(req.user.id, petIds) } });
   });
   app.get('/api/bookings/:id', async (req, res) => res.json({ success: true, data: { booking: present(await service.get(id(req.params.id), req.user.id)) } }));
   app.get('/api/bookings/:id/history', async (req, res) => {

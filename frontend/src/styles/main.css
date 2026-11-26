@@ -63,6 +63,15 @@ small { font-size: .86rem; }
 .panel { border: 1px solid var(--line); background: var(--white); border-radius: .85rem; padding: clamp(1rem, 3vw, 1.65rem); min-width: 0; }
 .panel h2 + *, .panel h3 + *, .panel form + *, .panel dl + * { margin-top: .8rem; }
 .panel h3:not(:first-child) { margin-top: 1.3rem; }
+.catalog-price-group + .catalog-price-group { margin-top: 1.5rem; }
+.catalog-price-table { width: 100%; border-collapse: collapse; }
+.catalog-price-table caption { padding: 0 0 .55rem; text-align: left; font-size: 1.1rem; font-weight: 700; }
+.catalog-price-table caption span { margin-left: .5rem; font-size: .85rem; font-weight: 400; }
+.catalog-price-table th, .catalog-price-table td { padding: .65rem clamp(.35rem, 1.5vw, .9rem); border: 1px solid var(--line); text-align: left; }
+.catalog-price-table thead th { background: #f0f5f1; }
+.catalog-price-table tbody th { width: 44%; font-weight: 500; }
+.catalog-price-table td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.catalog-price-table thead th:not(:first-child) { text-align: right; }
 .page-heading, .actions, .toolbar, .pagination { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
 .page-heading { justify-content: space-between; }
 .toolbar { align-items: end; }
@@ -95,6 +104,14 @@ select { appearance: none; padding-right: 1.85rem; background-image: linear-grad
 textarea { min-height: 6rem; resize: vertical; }
 .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .full { grid-column: 1 / -1; }
+.care-slots { min-width: 0; margin: 0; padding: 0; border: 0; }
+.care-slots legend { margin-bottom: .65rem; padding: 0; font-weight: 650; }
+.care-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .55rem; }
+.care-slot { display: flex; align-items: center; padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; cursor: pointer; }
+.care-slot input { width: 1rem; height: 1rem; min-height: 0; margin: 0; accent-color: var(--green); }
+.care-slot small { display: block; color: var(--muted); font-weight: 400; }
+.care-slot:has(input:checked) { border-color: var(--green); background: #f0f5f1; }
+.care-slot:has(input:disabled) { color: var(--muted); background: #f4f7f4; cursor: default; }
 .auth-shell { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; }
 .auth-visual { display: flex; flex-direction: column; justify-content: space-between; padding: clamp(1.7rem, 7vw, 6rem); gap: 4rem; }
 .auth-content { display: grid; place-items: center; padding: clamp(1.3rem, 5vw, 4rem); }

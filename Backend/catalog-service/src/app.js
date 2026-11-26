@@ -5,11 +5,11 @@ function createApp({ config, connection, logger, clock }) {
   const data = models(connection), catalog = new Catalog(connection, data, clock);
   const app = baseApp('catalog', connection, logger); Object.assign(app.locals, { models: data, catalog });
   app.post('/internal/catalog/quotes', internalAuth(config.token), async (req, res) => {
-    object(req.body, ['service_id', 'species', 'weight_kg']);
+    object(req.body, ['service_id', 'species', 'weight_kg', 'coat_type']);
     const serviceId = key(req.body.service_id, 'service_id', 100);
     if (!['DOG', 'CAT'].includes(req.body.species) || typeof req.body.weight_kg !== 'number' || !Number.isFinite(req.body.weight_kg) || req.body.weight_kg <= 0) invalid('Invalid pet species or weight');
-    // Booking applies these conditions as well as its own scheduling/resource rules.
-    res.json({ success: true, data: { quote: await catalog.quote(serviceId) } });
+    if (req.body.coat_type !== undefined && !['SHORT', 'LONG'].includes(req.body.coat_type)) invalid('Invalid pet coat type');
+    res.json({ success: true, data: { quote: await catalog.quote(serviceId, req.body) } });
   });
   app.use('/api/catalog', authenticate(config));
   app.get('/api/catalog/services', async (req, res) => {

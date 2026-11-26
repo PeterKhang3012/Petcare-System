@@ -1,9 +1,9 @@
 import { api, data, idempotency, pathId } from '../api/client';
-import type { Booking, BookingInput, Credentials, History, Maintenance, Page, Payment, Pet, PetInput, Quote, Resource, User } from '../types';
+import type { Booking, BookingInput, CareSlot, Credentials, History, Maintenance, Page, Payment, Pet, PetInput, Quote, RegistrationInput, Resource, User } from '../types';
 
 export const auth = {
   login: (input: Credentials) => data<{ accessToken: string }>(api.post('/auth/login', input)),
-  register: (input: Credentials) => api.post('/auth/register', input),
+  register: (input: RegistrationInput) => api.post('/auth/register', input),
   me: () => data<{ user: User }>(api.get('/auth/me')),
 };
 
@@ -18,9 +18,12 @@ export const pets = {
 export const bookings = {
   list: (page = 1, status?: string) => data<Page & { bookings: Booking[] }>(api.get('/bookings', { params: { page, status, limit: 10 } })),
   get: (id: string) => data<{ booking: Booking }>(api.get('/bookings/' + pathId(id))),
+  petStatuses: (ids: string[]) => data<{ statuses: Record<string, string> }>(api.get('/bookings/pet-statuses', { params: { pet_ids: ids.join(',') } })),
   quote: (input: BookingInput) => data<{ quote: Quote }>(api.post('/bookings/quotes', input)),
   availability: (input: BookingInput) => data<{ available: Resource[] }>(api.get('/bookings/availability', { params: input })),
-  create: (input: BookingInput & { expected_price_version: string }, key: string) =>
+  careSlots: (date: string, pet_id: string, service_id: string) =>
+    data<{ slots: CareSlot[] }>(api.get('/bookings/availability', { params: { date, pet_id, service_id } })),
+  create: (input: BookingInput & { expected_price_version: string; expected_pet_version?: number }, key: string) =>
     data<{ booking: Booking }>(api.post('/bookings', input, idempotency(key))),
   history: (id: string, page: number) => data<Page & { history: History[] }>(api.get('/bookings/' + pathId(id) + '/history', { params: { page } })),
   cancel: (id: string, reason: string, key: string) =>

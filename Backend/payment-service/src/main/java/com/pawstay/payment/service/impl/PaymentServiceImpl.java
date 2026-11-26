@@ -88,7 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
                 && attempt.getBookingExpiresAt().isAfter(clock.instant()) ? attempt.getPaymentUrl() : null;
         var event = outbox.findFirstByPaymentIdOrderByCreatedAtDescIdDesc(attempt.getId()).orElse(null);
         return new PaymentResponse(attempt.getId(), attempt.getBookingId(), attempt.getAmount(), attempt.getCurrency(),
-                attempt.getStatus().name(), attempt.getBookingExpiresAt(), url,
+                attempt.getStatus().name(), attempt.getBookingExpiresAt(), attempt.getVerifiedAt(), url,
                 event == null ? null : event.getStatus().name(), event == null ? null : event.getBookingOutcome());
     }
 }

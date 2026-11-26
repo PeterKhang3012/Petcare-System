@@ -47,7 +47,7 @@ Credentials mỗi hướng gọi phải khác nhau, >=32 ký tự ngẫu nhiên;
 
 Ngày/giờ cơ sở dùng `Asia/Ho_Chi_Minh` (UTC+07:00). Timestamps lưu UTC. Chăm sóc lấy duration từ Catalog, phải nằm trọn trong giờ mở cửa, kể cả giây/millisecond. Chuẩn bị/vệ sinh có thể nằm ngoài giờ mở. Lưu trú lấy ngày địa phương, tối thiểu 1, tối đa demo 365 đêm; thời điểm bắt đầu phải ở tương lai và tối đa 366 ngày trước. Client không quyết định end_at, duration, amount hoặc status.
 
-Khoảng `[start,end)`. Resource được phân bổ từ `start_at - preparation` đến `end_at + cleaning`; cùng Pet không được có các booking còn hiệu lực chồng khoảng phục vụ. Ví dụ chăm sóc 10:00–11:00 chiếm resource 09:45–11:30; booking kế tiếp bắt đầu 11:45 thì phân bổ bắt đầu đúng 11:30 và được nhận. Buffer không biến mất khi check-out sớm hoặc khi nhân viên đánh dấu vệ sinh xong.
+Khoảng phân bổ là `[start,end)`. Chăm sóc có chín khung 60 phút trong hai khoảng 08:00–12:00 và 13:00–18:00 (GMT+7). Mỗi khung gồm chuẩn bị và vệ sinh. Lưu trú vẫn phân bổ từ `start_at - preparation` đến `end_at + cleaning`. Cùng một thú cưng không thể có các booking còn hiệu lực chồng khoảng phục vụ.
 
 ## API
 
@@ -56,7 +56,7 @@ Khoảng `[start,end)`. Resource được phân bổ từ `start_at - preparatio
 | Method/path | Quyền | Nghiệp vụ |
 |---|---|---|
 | `POST /api/bookings/quotes` | USER | Pet context + báo giá; không giữ chỗ |
-| `GET /api/bookings/availability` | USER | Các query như quote; chỉ resource ID/code/group, không dữ liệu khách |
+| `GET /api/bookings/availability` | USER | Dùng `date`, `pet_id` và `service_id` để xem số chỗ và trạng thái theo khung chăm sóc. Query theo thời gian như quote vẫn trả danh sách tài nguyên phù hợp. |
 | `POST /api/bookings` | USER | Bắt buộc Idempotency-Key; tạo hold 15 phút |
 | `GET /api/bookings` | USER | Chỉ của mình; filter status/pet_id, page/limit |
 | `GET /api/bookings/:id` | USER/chủ | Booking và snapshot |

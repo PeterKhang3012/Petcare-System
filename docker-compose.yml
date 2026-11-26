@@ -42,12 +42,14 @@ services:
       MONGODB_URI: mongodb://auth-mongodb:27017/pawstay_auth
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
       JWT_PRIVATE_KEY_PATH: /auth-keys/private.pem
+      FACILITY_CONTACT_FILE: /app/data/facility-contact.json
       JWT_PUBLIC_KEY_PATH: /app/public-keys/auth-public.pem
     volumes:
       - *public-keys
       - ./Backend/auth-service/keys:/auth-keys:ro
       - ./Backend/auth-service/scripts/seed-staff.js:/app/scripts/seed-staff.js:ro
       - ./Backend/auth-service/scripts/data/staff.json:/app/scripts/data/staff.json:ro
+      - facility_contact_data:/app/data
     depends_on:
       jwt-keys-init:
         condition: service_completed_successfully
@@ -140,6 +142,7 @@ services:
     environment:
       PAYMENT_PORT: 8084
       VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:${GATEWAY_HOST_PORT:-8080}/api/payments/vnpay/return}
+      PAYMENT_FRONTEND_RETURN_URL: ${PAYMENT_FRONTEND_RETURN_URL:-http://localhost:5173/payments/return}
       PAYMENT_DB_URL: jdbc:mysql://payment-mysql:3306/payment_db?allowPublicKeyRetrieval=true
       PAYMENT_DB_USERNAME: payment_app
       PAYMENT_DB_PASSWORD: ${PAYMENT_MYSQL_PASSWORD:?Set PAYMENT_MYSQL_PASSWORD in the root .env}
@@ -226,6 +229,7 @@ services:
         timeout: 3s
         retries: 10
 volumes:
+  facility_contact_data:
   jwt_public_keys:
   auth_mongo_data:
   booking_mongo_data:

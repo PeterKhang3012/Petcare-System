@@ -6,6 +6,7 @@ function petModel(connection) {
       owner_id: { type: String, required: true, immutable: true },
       name: { type: String, required: true, maxlength: 100 },
       species: { type: String, required: true, enum: ["DOG", "CAT"] },
+      coat_type: { type: String, enum: ["SHORT", "LONG"] },
       breed: { type: String, maxlength: 100 },
       date_of_birth: String,
       weight_kg: {
@@ -37,6 +38,7 @@ function validatePet(body, partial = false, now = new Date()) {
   const fields = [
     "name",
     "species",
+    "coat_type",
     "breed",
     "date_of_birth",
     "weight_kg",
@@ -49,6 +51,11 @@ function validatePet(body, partial = false, now = new Date()) {
     if (!["DOG", "CAT"].includes(body.species))
       invalid("species must be DOG or CAT");
     data.species = body.species;
+  }
+  if (body.coat_type !== undefined) {
+    if (!["SHORT", "LONG"].includes(body.coat_type))
+      invalid("coat_type must be SHORT or LONG");
+    data.coat_type = body.coat_type;
   }
   if (!partial || body.weight_kg !== undefined) {
     if (

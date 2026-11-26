@@ -19,7 +19,18 @@ export function AuthPage({ register = false }: { register?: boolean }) {
     setError(undefined);
     try {
       if (register) {
-        await auth.register(input);
+        const full_name = String(form.get('full_name') ?? '').trim();
+        const phone = String(form.get('phone') ?? '').trim();
+        if (!full_name || !phone) {
+          setError('Vui lòng nhập họ tên và số điện thoại.');
+          return;
+        }
+        const confirm_password = String(form.get('confirm_password') ?? '');
+        if (confirm_password !== input.password) {
+          setError('Mật khẩu xác nhận không khớp.');
+          return;
+        }
+        await auth.register({ ...input, full_name, phone, confirm_password });
         navigate('/login', { replace: true, state: { registered: true } });
       } else {
         await signIn(input);
@@ -36,10 +47,15 @@ export function AuthPage({ register = false }: { register?: boolean }) {
     <main className="auth-content"><div className="auth-form"><h2>{register ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h2>
       <p className="muted">{register ? 'Bắt đầu với tài khoản khách hàng PawStay.' : 'Đăng nhập để sử dụng PawStay.'}</p>
       {location.state?.registered && <p className="feedback" role="status">Tạo tài khoản thành công. Bạn có thể đăng nhập.</p>}
-      <Feedback error={error} />
+      {typeof error === 'string' ? <div className="feedback error" role="alert">{error}</div> : <Feedback error={error} />}
       <form onSubmit={submit}>
+        {register && <>
+          <label>Họ và tên<input name="full_name" required autoComplete="name" /></label>
+          <label>Số điện thoại<input type="tel" name="phone" required autoComplete="tel" /></label>
+        </>}
         <label>Tên đăng nhập<input name="username" required maxLength={100} autoComplete="username" /></label>
         <label>Mật khẩu<input type="password" name="password" required minLength={register ? 8 : undefined} maxLength={72} autoComplete={register ? 'new-password' : 'current-password'} /></label>
+        {register && <label>Xác nhận mật khẩu<input type="password" name="confirm_password" required maxLength={72} autoComplete="new-password" /></label>}
         <button disabled={busy}>{busy ? 'Đang xử lý…' : register ? 'Đăng ký' : 'Đăng nhập'}</button>
       </form>
       <p className="muted">{register ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'} <Link to={register ? '/login' : '/register'}>{register ? 'Đăng nhập' : 'Đăng ký'}</Link></p>

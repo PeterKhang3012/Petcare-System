@@ -48,7 +48,7 @@ Các sơ đồ dùng Mermaid; mở README bằng trình xem hỗ trợ Mermaid �
 
 ```mermaid
 flowchart TD
-    A["POST /api/auth/register"] --> B["Controller chỉ lấy username/password"]
+    A["POST /api/auth/register"] --> B["Service kiểm tra thông tin đăng ký và xác nhận mật khẩu"]
     B --> C{"Credentials hợp lệ?"}
     C -->|Không| E["400 - Đầu vào sai"]
     C -->|Có| D{"Username đã tồn tại?"}
@@ -143,7 +143,7 @@ Các sơ đồ tập trung vào luồng chính; lỗi hệ thống khác đượ
 
 - Giữ `USER` cho Chủ thú cưng và `STAFF` cho Nhân viên để tương thích API hiện tại.
 - Bổ sung `permissions` vào tài khoản, phản hồi đăng nhập và JWT; chỉ chấp nhận `UPDATE_SERVICE_PRICE` trên tài khoản STAFF.
-- Đăng ký công khai luôn tạo USER với `permissions: []`. Controller chỉ lấy username/password; role, permissions và các trường khác từ client bị bỏ qua.
+- Đăng ký công khai luôn tạo USER với `permissions: []`. Service nhận `username`, `password`, `confirm_password`, `full_name` và `phone`.
 - Thêm middleware `requirePermission` bên cạnh `requireRole`; thêm `GET /api/auth/me` trả danh tính và quyền hiện tại.
 - `authenticate` kiểm tra chữ ký RS256, issuer, thời hạn và cấu trúc claims, sau đó đọc tài khoản từ MongoDB. Quyền hiện tại trong database được dùng để quyết định truy cập, không dùng quyền cũ trong JWT. Tài khoản không còn tồn tại trả 401; lỗi database chuyển tới bộ xử lý lỗi, không cho qua.
 - Seed hỗ trợ cấp quyền khi tạo nhân viên. Chạy lại không đổi mật khẩu/quyền; nếu quyền cấu hình khác tài khoản hiện tại, script báo lỗi để tránh hiểu nhầm đã cấp quyền.
@@ -187,22 +187,34 @@ Startup kiểm tra cặp key và cấu hình JWT, kết nối MongoDB, tạo uni
 ### POST /api/auth/register
 
 ```json
-{ "username": "owner01", "password": "password123" }
+{ "username": "owner01", "password": "password123", "confirm_password": "password123", "full_name": "Nguyễn An", "phone": "0912345678" }
 ```
 
-Trả 201: `{ "success": true, "message": "Registration successful", "data": { "user": { "id": "...", "username": "owner01", "role": "USER", "permissions": [] } } }`.
+Trả 201: `{ "success": true, "message": "Registration successful", "data": { "user": { "id": "...", "username": "owner01", "full_name": "Nguyễn An", "phone": "0912345678", "role": "USER", "permissions": [] } } }`.
+
+Họ tên và số điện thoại là chuỗi bắt buộc, được bỏ khoảng trắng đầu cuối trước khi lưu.
+
+`confirm_password` phải khớp chính xác với `password` và chỉ dùng để kiểm tra yêu cầu đăng ký.
 
 Username trim, phân biệt hoa thường, 1–100 ký tự. Mật khẩu đăng ký tối thiểu 8 ký tự, tối đa 72 byte UTF-8, không trim. Hash bcrypt cost 12, không trả hash qua API. Đầu vào sai trả 400; username trùng (kể cả tranh chấp unique index) trả 409.
 
 ### POST /api/auth/login
 
-Cùng body username/password cho cả hai vai trò. Trả 200 với `data.accessToken` và `data.user` gồm id, username, role, permissions. JWT gồm sub, username, role, permissions, iat, exp, iss. Sai username/mật khẩu đều trả 401 với cùng thông báo. Đăng nhập vẫn nhận mật khẩu cũ ngắn hơn 8 ký tự, tối đa 72 byte.
+Cùng body username/password cho cả hai vai trò. Trả 200 với `data.accessToken` và `data.user` gồm id, username, role, permissions và thông tin liên hệ nếu có. JWT gồm sub, username, role, permissions, iat, exp, iss. Sai username/mật khẩu đều trả 401 với cùng thông báo. Đăng nhập vẫn nhận mật khẩu cũ ngắn hơn 8 ký tự, tối đa 72 byte.
 
 ### GET /api/auth/me
 
 Gửi `Authorization: Bearer <accessToken>`. Trả 200 với `data.user` lấy từ MongoDB (không gồm mật khẩu). Thiếu/sai/hết hạn token hoặc tài khoản bị xóa trả 401. Đã xác thực nhưng thiếu role/permission tại route được bảo vệ trả 403.
 
 ## Tích hợp phân quyền
+
+### Thông tin liên hệ cơ sở
+
+`GET /api/facility/contact` trả `hotline`, `address` và `can_edit` cho người dùng đã đăng nhập. `PUT /api/facility/contact` nhận cả `hotline` và `address`. Địa chỉ rỗng được hiển thị là “Chưa cập nhật”.
+
+Chỉ STAFF có quyền `UPDATE_SERVICE_PRICE` được chỉnh sửa hotline và địa chỉ.
+
+Dữ liệu liên hệ được ghi vào tệp JSON theo `FACILITY_CONTACT_FILE`. Docker Compose dùng volume `facility_contact_data` để giữ tệp khi khởi động lại.
 
 ```javascript
 const { authenticate, requireRole, requirePermission } = require('./middleware/auth.middleware');

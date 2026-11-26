@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/payments/vnpay")
@@ -41,14 +42,24 @@ public class VnpayCallbackController {
     }
 
     @GetMapping("/return")
-    ResponseEntity<?> browserReturn() {
+    ResponseEntity<?> browserReturn(@RequestParam MultiValueMap<String, String> parameters) {
         if (!frontendReturnUrl.isBlank()) {
             try {
                 URI location = URI.create(frontendReturnUrl);
                 if (location.getHost() != null && location.getUserInfo() == null
                         && ("https".equalsIgnoreCase(location.getScheme()) || "http".equalsIgnoreCase(location.getScheme()))) {
-                    // Only redirect to the configured page. Gateway parameters are not forwarded.
-                    return ResponseEntity.status(HttpStatus.SEE_OTHER).location(location)
+                    var redirect = UriComponentsBuilder.fromUri(location).replaceQueryParam("payment_id");
+                    var references = parameters.get("vnp_TxnRef");
+                    if (references != null && references.size() == 1) {
+                        String reference = references.getFirst();
+                        if (reference.matches("[0-9a-f]{32}")) {
+                            // Lookup only. The frontend reads the result from the owner-scoped Payment API.
+                            String paymentId = reference.replaceFirst(
+                                    "^(.{8})(.{4})(.{4})(.{4})(.{12})$", "$1-$2-$3-$4-$5");
+                            redirect.replaceQueryParam("payment_id", paymentId);
+                        }
+                    }
+                    return ResponseEntity.status(HttpStatus.SEE_OTHER).location(redirect.build(true).toUri())
                             .cacheControl(CacheControl.noStore()).build();
                 }
             } catch (IllegalArgumentException exception) {

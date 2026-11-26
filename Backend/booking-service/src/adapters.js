@@ -10,8 +10,11 @@ function validQuote(quote, serviceId) {
     (quote.type === 'CARE' && (quote.unit !== 'SERVICE' || !Number.isSafeInteger(quote.duration_minutes) || quote.duration_minutes < 1 || quote.duration_minutes > 600)) ||
     (quote.type === 'BOARDING' && (quote.unit !== 'NIGHT' || quote.duration_minutes !== null))) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog quote');
   // Whitelist snapshots even for a remote dependency.
-  const { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species, min_weight_kg, max_weight_kg } = quote;
-  return { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species: [...allowed_species], min_weight_kg, max_weight_kg };
+  const { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species, min_weight_kg, max_weight_kg, price_rule_id } = quote;
+  if (price_rule_id !== undefined && (typeof price_rule_id !== 'string' || !/^[a-z0-9-]{1,100}$/.test(price_rule_id)))
+    fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog price group');
+  return { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species: [...allowed_species], min_weight_kg, max_weight_kg,
+    ...(price_rule_id ? { price_rule_id } : {}) };
 }
 function adapters(config) {
   return {
@@ -25,8 +28,9 @@ function adapters(config) {
         !['DOG', 'CAT'].includes(pet.species) || !Number.isFinite(pet.weight_kg) || pet.weight_kg <= 0 || !Number.isSafeInteger(pet.version) || pet.version < 1 ||
         typeof pet.name !== 'string' || !pet.name || pet.name.length > 100 || (pet.breed !== undefined && (typeof pet.breed !== 'string' || pet.breed.length > 100)) ||
         (pet.care_notes !== undefined && (typeof pet.care_notes !== 'string' || pet.care_notes.length > 2000))) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Pet response');
-      const { id, owner_id, name, species, breed, weight_kg, care_notes, version } = pet;
-      return { id, owner_id, name, species, breed, weight_kg, care_notes, version };
+      const { id, owner_id, name, species, breed, weight_kg, coat_type, care_notes, version } = pet;
+      if (coat_type !== undefined && !['SHORT', 'LONG'].includes(coat_type)) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Pet coat type');
+      return { id, owner_id, name, species, breed, weight_kg, coat_type, care_notes, version };
     },
     async catalog(serviceId, pet, correlationId) {
       let quote;
@@ -36,10 +40,12 @@ function adapters(config) {
       } else {
         if (!config.catalogBaseUrl) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Catalog has not been configured');
         let result;
-        try { result = await requestJson(config.catalogBaseUrl + '/internal/catalog/quotes', { method: 'POST', body: { service_id: serviceId, species: pet.species, weight_kg: pet.weight_kg },
+        try { result = await requestJson(config.catalogBaseUrl + '/internal/catalog/quotes', { method: 'POST', body: { service_id: serviceId, species: pet.species, weight_kg: pet.weight_kg, coat_type: pet.coat_type },
           headers: { 'X-Service-Token': config.tokens.BOOKING_TO_CATALOG_TOKEN, 'X-Correlation-ID': correlationId }, timeoutMs: config.timeoutMs }); }
         catch { fail(503, 'DEPENDENCY_UNAVAILABLE', 'Catalog is unavailable'); }
         if (result.status === 404) fail(404, 'NOT_FOUND', 'Service not found');
+        if (result.status === 400 && ['PET_COAT_REQUIRED', 'PET_PRICE_NOT_SUPPORTED'].includes(result.body?.code))
+          fail(400, result.body.code, result.body.message);
         if (result.status !== 200 || result.body.success !== true) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Catalog is unavailable');
         quote = result.body.data?.quote;
       }

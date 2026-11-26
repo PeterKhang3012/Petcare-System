@@ -9,7 +9,7 @@ const base = process.env.PAWSTAY_TEST_URL;
 if (!base) throw new Error('Đặt PAWSTAY_TEST_URL thành URL frontend trỏ vào stack kiểm thử riêng.');
 const report = (message) => console.log('ĐẠT · ' + message);
 const suffix = randomUUID().slice(0, 10);
-const customer = { username: 'paw_' + suffix, password: 'PawStayDemo!42' };
+const customer = { username: 'paw_' + suffix, password: 'PawStayDemo!42', confirm_password: 'PawStayDemo!42', full_name: 'Nguyễn An', phone: '0912345678' };
 const second = { ...customer, username: 'paw_other_' + suffix };
 const dateOffset = Number.parseInt(suffix.slice(0, 8), 16) % 190;
 const day = offset => new Date(Date.now() + (dateOffset + offset) * 86400000).toISOString().slice(0, 10);
@@ -50,18 +50,25 @@ async function browserFlow() {
     await page.goto(base + '/bookings/new');
     await page.waitForURL('**/login');
     await page.getByRole('link', { name: 'Đăng ký', exact: true }).click();
+    await page.getByLabel('Họ và tên').fill(customer.full_name);
+    await page.getByLabel('Số điện thoại').fill(customer.phone);
     await page.getByLabel('Tên đăng nhập').fill(customer.username);
-    await page.getByLabel('Mật khẩu').fill(customer.password);
+    await page.getByLabel('Mật khẩu', { exact: true }).fill(customer.password);
+    await page.getByLabel('Xác nhận mật khẩu').fill(customer.confirm_password);
     await page.getByRole('button', { name: 'Đăng ký', exact: true }).click();
     await page.getByText('Tạo tài khoản thành công. Bạn có thể đăng nhập.').waitFor();
     await page.getByLabel('Tên đăng nhập').fill(customer.username);
     await page.getByLabel('Mật khẩu').fill(customer.password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.getByRole('heading', { name: 'Xin chào, ' + customer.username }).waitFor();
+    await page.getByRole('link', { name: 'Tài khoản', exact: true }).click();
+    await page.getByText(customer.full_name, { exact: true }).waitFor();
+    await page.getByText(customer.phone, { exact: true }).waitFor();
     await page.getByRole('link', { name: 'Thú cưng', exact: true }).click();
     await page.getByRole('link', { name: 'Thêm thú cưng' }).click();
     await page.getByLabel('Tên thú cưng').fill('Miu ' + suffix);
     await page.locator('select[name="species"]').selectOption('CAT');
+    await page.locator('select[name="coat_type"]').selectOption('SHORT');
     await page.getByLabel('Cân nặng').fill('4');
     await page.getByRole('button', { name: 'Lưu hồ sơ' }).click();
     await page.getByRole('heading', { name: 'Miu ' + suffix }).waitFor();
@@ -73,7 +80,8 @@ async function browserFlow() {
     await page.getByRole('link', { name: 'Lịch đặt', exact: true }).click();
     await page.getByRole('link', { name: 'Đặt lịch chăm sóc' }).click();
     await page.locator('select[name="pet"]').selectOption(petId);
-    await page.getByLabel('Thời gian bắt đầu').fill(day(3) + 'T09:00');
+    await page.getByLabel('Ngày chăm sóc').fill(day(3));
+    await page.getByRole('radio', { name: /^09:00/ }).check();
     await page.getByRole('button', { name: 'Kiểm tra chỗ và báo giá' }).click();
     await page.getByRole('heading', { name: 'Báo giá' }).waitFor();
     await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
@@ -83,16 +91,15 @@ async function browserFlow() {
     let paymentId;
     if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
       await page.getByRole('button', { name: 'Khởi tạo thanh toán' }).click();
-      await page.getByRole('link', { name: 'Mở VNPay trong tab mới' }).waitFor();
+      await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).waitFor();
       paymentId = page.url().split('/').pop();
-      const url = await page.getByRole('link', { name: 'Mở VNPay trong tab mới' }).getAttribute('href');
+      const url = await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).getAttribute('href');
       assert.equal(new URL(url).searchParams.get('vnp_TxnRef'), paymentId.replaceAll('-', ''));
-      await page.goto(base + '/payments/return?vnp_ResponseCode=00');
-      await page.getByRole('heading', { name: 'Kiểm tra thanh toán' }).waitFor();
-      await page.getByRole('link', { name: 'Giao dịch gần nhất đã mở trên thiết bị' }).click();
+      await page.goto(base + '/payments/return?payment_id=' + paymentId + '&vnp_ResponseCode=00');
+      await page.getByRole('heading', { name: 'Chi tiết thanh toán' }).waitFor();
       await page.getByText('Đang chờ', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Lấy lại liên kết VNPay' }).click();
-      await page.getByRole('link', { name: 'Mở VNPay trong tab mới' }).waitFor();
+      await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).waitFor();
       report('Trình duyệt tạo Payment, tra cứu Return và lấy lại liên kết bằng cùng khóa');
     }
     await page.goto(base + '/staff');
@@ -142,7 +149,7 @@ report('Auth từ chối trùng tên, sai mật khẩu, thiếu/sai JWT, sai quy
 
 const input = { pet_id: petId, service_id: 'bath', start_at: day(4) + 'T09:00:00+07:00' };
 const quote = (await check('POST', '/bookings/quotes', 200, { body: input, token })).data.quote;
-const body = { ...input, expected_price_version: quote.price_version_id };
+const body = { ...input, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version };
 const concurrent = await Promise.all([1, 2].map(() => call('POST', '/bookings', { body, token, key: suffix + '-booking' })));
 assert.deepEqual(concurrent.map(result => result.status).sort(), [200, 201]);
 const duplicate = concurrent[0].value.data.booking;
@@ -241,11 +248,11 @@ if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
   assert.equal(booking.accepted_payment_id, paymentId);
   report('Payment thực với IPN ký cục bộ: Return không ghi trạng thái, từ chối sai chữ ký/số tiền, xử lý replay và Outbox xác nhận booking');
 
-  const newPet = (await check('POST', '/pets', 201, { body: { name: 'Kiểm thử VNPay', species: 'CAT', weight_kg: 4 }, token })).data.pet;
+  const newPet = (await check('POST', '/pets', 201, { body: { name: 'Kiểm thử VNPay', species: 'CAT', coat_type: 'SHORT', weight_kg: 4 }, token })).data.pet;
   async function newAttempt(index) {
     const request = { pet_id: newPet.id, service_id: 'boarding', check_in_date: day(index), check_out_date: day(index + 1) };
     const quote = (await check('POST', '/bookings/quotes', 200, { body: request, token })).data.quote;
-    const next = (await check('POST', '/bookings', 201, { body: { ...request, expected_price_version: quote.price_version_id },
+    const next = (await check('POST', '/bookings', 201, { body: { ...request, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version },
       token, key: suffix + '-boarding-' + index })).data.booking;
     return check('POST', '/payments', 201, { body: { booking_id: next.id }, token, key: suffix + '-boarding-payment-' + index });
   }

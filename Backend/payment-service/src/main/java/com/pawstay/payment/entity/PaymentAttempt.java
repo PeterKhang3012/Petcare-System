@@ -110,6 +110,10 @@ public class PaymentAttempt {
         return paymentUrl;
     }
 
+    public Instant getVerifiedAt() {
+        return verifiedAt;
+    }
+
     public void recordGatewayResult(Status result, String transactionNo, String responseCode,
                                     String transactionStatus, Instant now) {
         if (status != Status.PENDING || result == Status.PENDING) {

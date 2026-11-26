@@ -2,7 +2,7 @@ export const money = (amount: number, currency = 'VND') => new Intl.NumberFormat
 export const dateTime = (value?: string) => value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value)) : '—';
 export const facilityTime = (value: string) => value.length === 16 ? value + ':00+07:00' : value + '+07:00';
 export const labels: Record<string, string> = {
-  ACTIVE: 'Đang chăm sóc', ARCHIVED: 'Đã lưu trữ', DOG: 'Chó', CAT: 'Mèo',
+  ACTIVE: 'Đang sử dụng', ARCHIVED: 'Đã lưu trữ', DOG: 'Chó', CAT: 'Mèo',
   PENDING_PAYMENT: 'Chờ thanh toán', CONFIRMED: 'Đã xác nhận', CHECKED_IN: 'Đã nhận thú cưng',
   COMPLETED: 'Hoàn tất', CANCELLED: 'Đã hủy', EXPIRED: 'Hết hạn',
   PENDING: 'Đang chờ', SUCCEEDED: 'Thành công', FAILED: 'Thất bại',

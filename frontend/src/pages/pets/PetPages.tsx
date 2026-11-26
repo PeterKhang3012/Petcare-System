@@ -1,7 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLoad } from '../../hooks/useLoad';
-import { pets } from '../../services';
+import { bookings, pets } from '../../services';
 import type { Pet, PetInput } from '../../types';
 import { Empty, Feedback, Pagination, Status } from '../../UI/Feedback';
 import { label } from '../../utils/format';
@@ -10,9 +10,25 @@ export function PetList() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('ACTIVE');
   const result = useLoad(useCallback(() => pets.list(page, status), [page, status]));
+  const rows = result.data?.pets;
+  const bookingStatuses = useLoad(useCallback(() => {
+    const ids = rows?.filter(pet => pet.status === 'ACTIVE').map(pet => pet.id) ?? [];
+    return ids.length ? bookings.petStatuses(ids) : Promise.resolve(undefined);
+  }, [rows]));
   return <><header className="page-heading"><h1>Thú cưng</h1><Link className="button" to="/pets/new">Thêm thú cưng</Link></header>
-    <div className="toolbar"><label>Trạng thái<select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="ACTIVE">Đang chăm sóc</option><option value="ARCHIVED">Đã lưu trữ</option><option value="ALL">Tất cả</option></select></label></div>
-    <Feedback {...result} retry={result.reload}>{result.data && <>{result.data.pets.length ? <div className="card-grid">{result.data.pets.map(pet => <Link className="panel pet-card" to={'/pets/' + pet.id} key={pet.id}><span className="pet-icon" aria-hidden="true">{pet.species === 'DOG' ? '🐶' : '🐱'}</span><h2>{pet.name}</h2><p>{label(pet.species)} · {pet.weight_kg} kg</p><Status value={pet.status} /></Link>)}</div> : <Empty>Chưa có thú cưng ở trạng thái này.</Empty>}<Pagination result={result.data} change={setPage} /></>}</Feedback>
+    <div className="toolbar"><label>Trạng thái hồ sơ<select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="ACTIVE">Đang sử dụng</option><option value="ARCHIVED">Đã lưu trữ</option><option value="ALL">Tất cả</option></select></label></div>
+    <Feedback error={bookingStatuses.error} retry={bookingStatuses.reload} />
+    <Feedback {...result} retry={result.reload}>{result.data && <>{result.data.pets.length ? <div className="card-grid">{result.data.pets.map(pet => {
+      const bookingStatus = bookingStatuses.data?.statuses[pet.id];
+      return <Link className="panel pet-card" to={'/pets/' + pet.id} key={pet.id}>
+        <span className="pet-icon" aria-hidden="true">{pet.species === 'DOG' ? '🐶' : '🐱'}</span>
+        <h2>{pet.name}</h2><p>{label(pet.species)} · {pet.weight_kg} kg</p>
+        {pet.status === 'ARCHIVED' ? <Status value="ARCHIVED" /> :
+          bookingStatus === 'CONFIRMED' ? <span className="status status-confirmed">Đã thanh toán</span> :
+          bookingStatus ? <Status value={bookingStatus} /> :
+          bookingStatuses.data && <span className="status">Chưa có lịch đang hiệu lực</span>}
+      </Link>;
+    })}</div> : <Empty>Chưa có thú cưng ở trạng thái này.</Empty>}<Pagination result={result.data} change={setPage} /></>}</Feedback>
   </>;
 }
 
@@ -28,6 +44,8 @@ function PetForm({ pet, saved }: { pet?: Pet; saved: (pet: Pet) => void }) {
     };
     const birth = String(form.get('birth'));
     if (birth) input.date_of_birth = birth;
+    const coatType = form.get('coat_type');
+    if (coatType === 'SHORT' || coatType === 'LONG') input.coat_type = coatType;
     setBusy(true);
     setError(undefined);
     try { saved((await (pet ? pets.update(pet.id, input) : pets.create(input))).pet); }
@@ -37,6 +55,7 @@ function PetForm({ pet, saved }: { pet?: Pet; saved: (pet: Pet) => void }) {
   return <form className="panel form-grid" onSubmit={submit}>
     <label>Tên thú cưng<input name="name" required maxLength={100} defaultValue={pet?.name}/></label>
     <label>Loài<select name="species" defaultValue={pet?.species ?? 'DOG'}><option value="DOG">Chó</option><option value="CAT">Mèo</option></select></label>
+    <label>Loại lông<select name="coat_type" required defaultValue={pet?.coat_type ?? ''}><option value="" disabled>Chọn loại lông</option><option value="SHORT">Lông ngắn</option><option value="LONG">Lông dài</option></select></label>
     <label>Cân nặng (kg)<input name="weight" type="number" step="any" min="0.01" max="500" required defaultValue={pet?.weight_kg}/></label>
     <label>Giống<input name="breed" maxLength={100} defaultValue={pet?.breed}/></label>
     <label>Ngày sinh<input name="birth" type="date" required={Boolean(pet?.date_of_birth)} defaultValue={pet?.date_of_birth}/></label>
@@ -67,7 +86,7 @@ export function PetDetail() {
   return <><Link to="/pets">Danh sách thú cưng</Link><Feedback {...result} retry={result.reload}>{pet && <>
     <header className="page-heading"><h1>{pet.name}</h1><Status value={pet.status}/></header><Feedback error={error}/>
     {editing ? <><PetForm pet={pet} saved={() => { setEditing(false); result.reload(); }}/><button className="secondary" onClick={() => setEditing(false)}>Hủy chỉnh sửa</button></> :
-    <section className="panel"><dl className="details"><dt>Loài</dt><dd>{label(pet.species)}</dd><dt>Cân nặng</dt><dd>{pet.weight_kg} kg</dd><dt>Giống</dt><dd>{pet.breed || '—'}</dd><dt>Ngày sinh</dt><dd>{pet.date_of_birth || '—'}</dd><dt>Ghi chú chăm sóc</dt><dd>{pet.care_notes || '—'}</dd></dl>
+    <section className="panel"><dl className="details"><dt>Loài</dt><dd>{label(pet.species)}</dd><dt>Cân nặng</dt><dd>{pet.weight_kg} kg</dd><dt>Loại lông</dt><dd>{pet.coat_type === 'SHORT' ? 'Lông ngắn' : pet.coat_type === 'LONG' ? 'Lông dài' : 'Chưa cập nhật'}</dd><dt>Giống</dt><dd>{pet.breed || '—'}</dd><dt>Ngày sinh</dt><dd>{pet.date_of_birth || '—'}</dd><dt>Ghi chú chăm sóc</dt><dd>{pet.care_notes || '—'}</dd></dl>
       {pet.status === 'ACTIVE' && <div className="actions"><button onClick={() => setEditing(true)}>Chỉnh sửa</button><button className="secondary" disabled={busy} onClick={archive}>Lưu trữ</button></div>}
     </section>}
   </>}</Feedback></>;

@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 app.use(express.json({ limit: "16kb" }));
 app.use("/api/auth", require("./routes/auth.routes"));
+app.use("/api/facility/contact", require("./routes/facility-contact"));
 app.use((_req, res) =>
   res.status(404).json({ success: false, message: "Not found" }),
 );

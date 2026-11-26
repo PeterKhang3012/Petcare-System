@@ -15,18 +15,28 @@ function publicUser(user) {
   return {
     id: String(user._id),
     username: user.username,
+    full_name: user.full_name,
+    phone: user.phone,
     role,
     permissions: validatePermissions(role, user.permissions),
   };
 }
 
-async function register(username, password) {
+async function register({ username, password, confirm_password, full_name, phone }) {
   username = validateCredentials(username, password);
+  if (typeof full_name !== "string" || !full_name.trim())
+    throw httpError(400, "Full name is required");
+  if (typeof phone !== "string" || !phone.trim())
+    throw httpError(400, "Phone number is required");
+  if (confirm_password !== password)
+    throw httpError(400, "Password confirmation must match the password");
   if (await Auth.exists({ username }))
     throw httpError(409, "Username already exists");
   try {
     const user = await Auth.create({
       username,
+      full_name: full_name.trim(),
+      phone: phone.trim(),
       password: await bcrypt.hash(password, 12),
       role: ROLES.OWNER,
       permissions: [],

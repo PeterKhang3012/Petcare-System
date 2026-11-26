@@ -31,7 +31,7 @@ function createApp({ config, connection, logger, clock = () => new Date() }) {
           "NOT_FOUND",
           "An active pet owned by this user was not found",
         );
-      const { owner_id, name, species, breed, weight_kg, care_notes, version } =
+      const { owner_id, name, species, coat_type, breed, weight_kg, care_notes, version } =
         pet;
       res.json({
         success: true,
@@ -41,6 +41,7 @@ function createApp({ config, connection, logger, clock = () => new Date() }) {
             owner_id,
             name,
             species,
+            coat_type,
             breed,
             weight_kg,
             care_notes,

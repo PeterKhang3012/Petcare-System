@@ -1,10 +1,12 @@
 export type Role = 'USER' | 'STAFF';
-export interface User { id: string; username: string; role: Role; permissions: string[] }
+export interface User { id: string; username: string; role: Role; permissions: string[]; full_name?: string; phone?: string }
 export interface Credentials { username: string; password: string }
+export interface RegistrationInput extends Credentials { full_name: string; phone: string; confirm_password: string }
 export interface Page { page: number; limit: number; total: number }
 export interface PetInput {
   name: string;
   species: 'DOG' | 'CAT';
+  coat_type?: 'SHORT' | 'LONG';
   weight_kg: number;
   breed?: string;
   date_of_birth?: string;
@@ -17,7 +19,14 @@ export interface Pet extends PetInput {
 }
 export type BookingInput = { pet_id: string; service_id: string } &
   ({ start_at: string } | { check_in_date: string; check_out_date: string });
+export interface CareSlot {
+  start_at: string;
+  end_at: string;
+  available: number;
+  status: 'AVAILABLE' | 'FULL' | 'PET_BUSY' | 'OUTSIDE_BOOKING_WINDOW';
+}
 export interface Quote {
+  pet_version?: number;
   price_version_id: string;
   total_amount: number;
   currency: string;
@@ -44,6 +53,7 @@ export interface Payment {
   status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
   expires_at?: string;
   payment_url?: string;
+  verified_at?: string;
   booking_sync_status?: 'PENDING' | 'DELIVERED' | 'REJECTED' | 'DEAD_LETTER';
   booking_sync_outcome?: string;
 }

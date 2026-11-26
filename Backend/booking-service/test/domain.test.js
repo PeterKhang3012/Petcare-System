@@ -1,18 +1,40 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { bookingInput, calculate } = require('../src/time');
+const { bookingInput, calculate, careSlots, localTime } = require('../src/time');
 const { validQuote, adapters } = require('../src/adapters');
 const { timestamp, internalAuth } = require('../src/platform');
 const { supportsTransactions } = require('../src/transactions');
+const { BookingService } = require('../src/booking');
 const fixture = require('../fixtures/catalog.json');
 const config = { hours: { open: '08:00', close: '18:00', boardingIn: '14:00', boardingOut: '12:00' }, preparationMinutes: 15, cleaningMinutes: 30 };
 const now = new Date('2030-01-01T02:00:00Z');
-test('care duration, opening boundaries, UTC, preparation and cleaning', () => {
+test('pet booking badges scope the query to the owner and prefer an ongoing visit', async () => {
+  const models = { Booking: { find(filter) {
+    assert.equal(filter.owner_id, 'owner');
+    assert.deepEqual(filter.pet_id, { $in: ['a', 'b', 'c', 'd'] });
+    assert.deepEqual(filter.$or[1], { status: 'PENDING_PAYMENT', expires_at: { $gt: now } });
+    return { select: () => ({ lean: async () => [
+      { pet_id: 'a', status: 'CONFIRMED' },
+      { pet_id: 'a', status: 'CHECKED_IN' },
+      { pet_id: 'a', status: 'PENDING_PAYMENT' },
+      { pet_id: 'b', status: 'CONFIRMED' },
+      { pet_id: 'c', status: 'PENDING_PAYMENT' },
+    ] }) };
+  } } };
+  const service = new BookingService({ models, clock: () => now });
+  assert.deepEqual(await service.petBookingStatuses('owner', ['a', 'b', 'c', 'd']),
+    { a: 'CHECKED_IN', b: 'CONFIRMED', c: 'PENDING_PAYMENT' });
+});
+test('care uses the fixed local schedule and includes preparation and cleaning in one hour', () => {
+  assert.deepEqual(careSlots('2030-01-02').map(slot => localTime(slot.start_at)), ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00']);
   const input = bookingInput({ pet_id: 'a'.repeat(24), service_id: 'bath', start_at: '2030-01-02T17:00:00+07:00' });
   const quote = calculate(input, fixture[0], config, now);
   assert.equal(quote.end_at.toISOString(), '2030-01-02T11:00:00.000Z');
-  assert.equal(quote.allocation_start_at.toISOString(), '2030-01-02T09:45:00.000Z');
-  assert.equal(quote.allocation_end_at.toISOString(), '2030-01-02T11:30:00.000Z');
+  assert.equal(quote.allocation_start_at.toISOString(), '2030-01-02T10:00:00.000Z');
+  assert.equal(quote.allocation_end_at.toISOString(), '2030-01-02T11:00:00.000Z');
+  for (const time of ['08:15', '12:00', '18:00']) {
+    assert.throws(() => calculate({ ...input, start_at: `2030-01-02T${time}:00+07:00` }, fixture[0], config, now));
+  }
   assert.throws(() => calculate({ ...input, start_at: '2030-01-02T17:00:00.001+07:00' }, fixture[0], config, now));
   assert.throws(() => calculate({ ...input, start_at: '2030-01-02T07:59:59+07:00' }, fixture[0], config, now));
   assert.throws(() => calculate({ ...input, start_at: now.toISOString() }, fixture[0], config, now));
@@ -24,6 +46,8 @@ test('boarding uses facility calendar nights and protects safe integer arithmeti
   const quote = calculate(input, fixture[1], config, now);
   assert.equal(quote.nights, 2); assert.equal(quote.total_amount, 400000);
   assert.equal(quote.start_at.toISOString(), '2030-01-02T07:00:00.000Z');
+  assert.equal(+quote.start_at - +quote.allocation_start_at, 15 * 60000);
+  assert.equal(+quote.allocation_end_at - +quote.end_at, 30 * 60000);
   assert.equal(quote.end_at.toISOString(), '2030-01-04T05:00:00.000Z');
   assert.throws(() => calculate({ ...input, check_out_date: input.check_in_date }, fixture[1], config, now));
   assert.throws(() => calculate(input, { ...fixture[1], unit_price: Number.MAX_SAFE_INTEGER }, config, now));

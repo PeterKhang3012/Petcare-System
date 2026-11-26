@@ -224,7 +224,7 @@
     "/api/bookings/availability": {
       "get": {
         "summary": "USER previews compatible capacity",
-        "description": "Same timing rules as quotes. Counts eligible resource slots only; the transaction can still reject a competing create. No customer/pet/allocation data is returned.",
+        "description": "With date, pet_id and service_id, returns the nine care slots in facility time (UTC+07:00). Otherwise, returns compatible resources for the requested time as in quotes. Neither form holds a resource.",
         "operationId": "get_api_bookings_availability",
         "responses": {
           "200": {
@@ -251,48 +251,109 @@
                       ]
                     },
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "available": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "pattern": "^[a-fA-F0-9]{24}$"
-                              },
-                              "code": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 100
-                              },
-                              "group": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 100
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "available": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "pattern": "^[a-fA-F0-9]{24}$"
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  },
+                                  "group": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "code",
+                                  "group"
+                                ],
+                                "additionalProperties": false
                               }
                             },
-                            "required": [
-                              "id",
-                              "code",
-                              "group"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "holds_resource": {
+                              "type": "boolean",
+                              "enum": [
+                                false
+                              ]
+                            }
+                          },
+                          "required": [
+                            "available",
+                            "holds_resource"
+                          ],
+                          "additionalProperties": false
                         },
-                        "holds_resource": {
-                          "type": "boolean",
-                          "enum": [
-                            false
-                          ]
+                        {
+                          "type": "object",
+                          "properties": {
+                            "date": {
+                              "type": "string",
+                              "format": "date"
+                            },
+                            "slots": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "start_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "end_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "AVAILABLE",
+                                      "FULL",
+                                      "PET_BUSY",
+                                      "OUTSIDE_BOOKING_WINDOW"
+                                    ]
+                                  },
+                                  "available": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "start_at",
+                                  "end_at",
+                                  "status",
+                                  "available"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "holds_resource": {
+                              "type": "boolean",
+                              "enum": [
+                                false
+                              ]
+                            }
+                          },
+                          "required": [
+                            "date",
+                            "slots",
+                            "holds_resource"
+                          ],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": [
-                        "available",
-                        "holds_resource"
-                      ],
-                      "additionalProperties": false
+                      ]
                     }
                   },
                   "required": [
@@ -368,6 +429,15 @@
             "name": "check_out_date",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Facility date for daily care availability. Send instead of timing parameters.",
             "schema": {
               "type": "string",
               "format": "date"
@@ -2473,6 +2543,75 @@
           }
         ]
       }
+    },
+    "/api/bookings/pet-statuses": {
+      "get": {
+        "summary": "Get active booking statuses for up to 20 pets",
+        "description": "Returns a map from each owned pet ID with an active booking to its highest-priority status. Expired holds are omitted.",
+        "parameters": [
+          {
+            "name": "pet_ids",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated pet IDs",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "statuses"
+                      ],
+                      "properties": {
+                        "statuses": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING_PAYMENT",
+                              "CONFIRMED",
+                              "CHECKED_IN"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2612,6 +2751,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100
+          },
+          "expected_pet_version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Required for quotes that return pet_version. Use the value from the reviewed quote."
           }
         },
         "required": [
@@ -2716,6 +2860,10 @@
           },
           "max_weight_kg": {
             "type": "number"
+          },
+          "price_rule_id": {
+            "type": "string",
+            "description": "Selected price group for services with grouped prices."
           }
         },
         "required": [
@@ -2811,6 +2959,11 @@
             "enum": [
               false
             ]
+          },
+          "pet_version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Present for grouped prices. Send as expected_pet_version when confirming the quote."
           }
         },
         "required": [

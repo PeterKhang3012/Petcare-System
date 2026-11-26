@@ -7,11 +7,13 @@ import { bookingServices } from '../../services/catalog';
 import { Empty, Feedback, HistoryList, Pagination, Status } from '../../UI/Feedback';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Booking, BookingInput, Quote } from '../../types';
-import { dateTime, facilityTime, label, money } from '../../utils/format';
+import { dateTime, label, money } from '../../utils/format';
 import { knownPayment, paymentKey, rememberPayment } from '../../utils/paymentStorage';
 import { isAxiosError } from 'axios';
 
 const states = ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'EXPIRED'];
+const careTime = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+const careDate = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
 
 export function BookingsPage() {
   const [page, setPage] = useState(1);
@@ -40,19 +42,30 @@ export function BookingNew() {
   const retryKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const navigate = useNavigate();
   const boarding = selected?.type === 'BOARDING';
+  const [petId, setPetId] = useState('');
+  const [date, setDate] = useState('');
+  const [start, setStart] = useState('');
+  const slots = useLoad(useCallback(() => !boarding && serviceId && petId && date
+    ? bookings.careSlots(date, petId, serviceId) : Promise.resolve(undefined), [boarding, serviceId, petId, date]));
+  const selectedSlot = slots.data?.slots.find(slot => slot.start_at === start && slot.available > 0);
   async function quote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!boarding && !selectedSlot) return;
     const form = new FormData(event.currentTarget);
     const input: BookingInput = { pet_id: String(form.get('pet')), service_id: serviceId,
       ...(boarding ? { check_in_date: String(form.get('checkIn')), check_out_date: String(form.get('checkOut')) } :
-        { start_at: facilityTime(String(form.get('start'))) }) };
+        { start_at: start }) };
     setError(undefined); setBusy(true); setReview(undefined);
     try {
       const [price, capacity] = await Promise.all([bookings.quote(input), bookings.availability(input)]);
-      const fingerprint = JSON.stringify({ ...input, expected_price_version: price.quote.price_version_id });
+      const fingerprint = JSON.stringify({ ...input, expected_price_version: price.quote.price_version_id, expected_pet_version: price.quote.pet_version });
       const key = retryKey.current?.fingerprint === fingerprint ? retryKey.current.key : crypto.randomUUID();
       retryKey.current = { fingerprint, key };
       setReview({ input, quote: price.quote, available: capacity.available.length, key });
+      if (!boarding && !capacity.available.length) {
+        setStart('');
+        slots.reload();
+      }
     } catch (failure) { setError(failure); }
     finally { setBusy(false); }
   }
@@ -60,23 +73,43 @@ export function BookingNew() {
     if (!review) return;
     setBusy(true); setError(undefined);
     try {
-      const result = await bookings.create({ ...review.input, expected_price_version: review.quote.price_version_id }, review.key);
+      const result = await bookings.create({ ...review.input, expected_price_version: review.quote.price_version_id, expected_pet_version: review.quote.pet_version }, review.key);
       navigate('/bookings/' + result.booking.id, { replace: true });
     } catch (failure) {
       setError(failure);
-      if (isAxiosError(failure) && failure.response?.data?.code === 'PRICE_CHANGED') setReview(undefined);
+      const code = isAxiosError(failure) && failure.response?.data?.code;
+      if (code === 'PRICE_CHANGED' || code === 'SLOT_UNAVAILABLE' || code === 'PET_TIME_CONFLICT') {
+        setReview(undefined);
+        if (!boarding && code !== 'PRICE_CHANGED') {
+          setStart('');
+          slots.reload();
+        }
+      }
     } finally { setBusy(false); }
   }
   return <><Link to="/bookings">Danh sách lịch đặt</Link><h1>Đặt lịch chăm sóc</h1>
     <Feedback {...catalog} retry={catalog.reload}>{catalog.data && (!services.length ? <Empty>Chưa có dịch vụ đang hoạt động.</Empty> :
     <Feedback {...petList} retry={petList.reload}>{petList.data && (petList.data.pets.length ? <>
       <form className="panel form-grid" onSubmit={quote} onChange={() => { setReview(undefined); setError(undefined); }} key={petPage}>
-        <label>Thú cưng<select name="pet" required><option value="">Chọn thú cưng</option>{petList.data.pets.map(pet => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>
-        <label>Dịch vụ<select value={serviceId} onChange={event => setSelection(event.target.value)} required>{services.map(service => <option key={service.service_id} value={service.service_id}>{service.name}</option>)}</select></label>
+        <label>Thú cưng<select name="pet" value={petId} disabled={busy} onChange={event => { setPetId(event.target.value); setStart(''); }} required><option value="">Chọn thú cưng</option>{petList.data.pets.map(pet => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>
+        <label>Dịch vụ<select value={serviceId} disabled={busy} onChange={event => { setSelection(event.target.value); setStart(''); }} required>{services.map(service => <option key={service.service_id} value={service.service_id}>{service.name}</option>)}</select></label>
         {boarding ? <><label>Ngày nhận thú cưng<input type="date" name="checkIn" required/></label><label>Ngày trả thú cưng<input type="date" name="checkOut" required/></label></> :
-          <label>Thời gian bắt đầu (GMT+7)<input type="datetime-local" name="start" required/></label>}
-        <div className="full"><button disabled={busy}>Kiểm tra chỗ và báo giá</button></div>
-      </form><Pagination result={petList.data} change={page => { setPetPage(page); setReview(undefined); }}/></> :
+          <>
+            <label>Ngày chăm sóc<input type="date" name="date" min={careDate.format(new Date())} value={date} disabled={busy} onChange={event => { setDate(event.target.value); setStart(''); }} required/></label>
+            {petId && date && <fieldset className="full care-slots" disabled={busy}>
+              <legend>Khung giờ chăm sóc (GMT+7)</legend>
+              <Feedback {...slots} retry={slots.reload}>{slots.data && <div className="care-slot-grid">{slots.data.slots.map(slot => (
+                <label key={slot.start_at} className="care-slot">
+                  <input type="radio" name="start" value={slot.start_at} checked={start === slot.start_at} onChange={() => setStart(slot.start_at)} disabled={!slot.available} />
+                  <span>{careTime.format(new Date(slot.start_at))}–{careTime.format(new Date(slot.end_at))}
+                    <small>{slot.status === 'AVAILABLE' ? `Còn ${slot.available} chỗ` : slot.status === 'PET_BUSY' ? 'Thú cưng đã có lịch' : slot.status === 'FULL' ? 'Hết chỗ' : 'Ngoài thời gian đặt'}</small>
+                  </span>
+                </label>
+              ))}</div>}</Feedback>
+            </fieldset>}
+          </>}
+        <div className="full"><button disabled={busy || (!boarding && !selectedSlot)}>Kiểm tra chỗ và báo giá</button></div>
+      </form><Pagination result={petList.data} change={page => { setPetPage(page); setPetId(''); setStart(''); setReview(undefined); }}/></> :
       <Empty>Hãy <Link to="/pets/new">thêm thú cưng</Link> trước khi đặt lịch.</Empty>)}</Feedback>)}</Feedback>
     <Feedback error={error} loading={busy}/>
     {review && <section className="panel"><h2>Báo giá</h2><p className="amount">{money(review.quote.total_amount, review.quote.currency)}</p>

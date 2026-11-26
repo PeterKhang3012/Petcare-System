@@ -32,7 +32,11 @@ export function errorMessage(error: unknown) {
   if (status === 401) return 'Thông tin đăng nhập không đúng hoặc phiên đã hết hạn.';
   if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
   if (status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
-  if (status === 409 && data?.code === 'PRICE_CHANGED') return 'Giá đã thay đổi. Hãy yêu cầu báo giá mới trước khi đặt lịch.';
+  if (status === 409 && data?.code === 'PRICE_CHANGED') return 'Giá hoặc hồ sơ thú cưng đã thay đổi. Hãy yêu cầu báo giá mới trước khi đặt lịch.';
+  if (status === 409 && data?.code === 'SLOT_UNAVAILABLE') return 'Chỗ vừa hết. Hãy chọn thời gian khác.';
+  if (status === 409 && data?.code === 'PET_TIME_CONFLICT') return 'Thú cưng đã có lịch trùng với thời gian này.';
+  if (status === 400 && data?.code === 'PET_COAT_REQUIRED') return 'Hãy cập nhật loại lông trong hồ sơ thú cưng rồi báo giá lại.';
+  if (status === 400 && data?.code === 'PET_PRICE_NOT_SUPPORTED') return 'Dịch vụ này chưa có nhóm giá phù hợp với cân nặng của thú cưng.';
   if (status === 409 && data?.code === 'PRICE_VERSION_CONFLICT') return 'Giá vừa được thay đổi. Hãy tải lại giá hiện tại trước khi cập nhật.';
   if (status === 409 && data?.code === 'LOG_VERSION_CONFLICT') return 'Nhật ký vừa được chỉnh sửa. Hãy tải lại phiên bản mới nhất.';
   if (status === 409 && data?.code === 'SYNC_IN_PROGRESS') return 'Đã có yêu cầu đang đồng bộ. Hãy xem trạng thái trong hồ sơ chăm sóc.';

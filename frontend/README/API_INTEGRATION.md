@@ -4,7 +4,7 @@ Frontend gọi các route dưới đây qua Nginx. Các route mặc định nh�
 
 | Method và route | Service, quyền | Đầu vào và đầu ra | Lỗi chính |
 | --- | --- | --- | --- |
-| POST `/api/auth/register` | Auth, công khai | `username,password` → `data.user` | 400, 409 tên trùng |
+| POST `/api/auth/register` | Auth, công khai | `username,password,confirm_password,full_name,phone` → `data.user` | 400, 409 tên trùng |
 | POST `/api/auth/login` | Auth, công khai | `username,password` → `data.accessToken,user` | 400, 401 |
 | GET `/api/auth/me` | Auth | Bearer → `data.user` | 401 |
 | GET `/api/pets` | Pet, USER | `page,limit,status` → `data.pets,page,limit,total` | 400, 401, 403, 503 |

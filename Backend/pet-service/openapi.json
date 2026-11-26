@@ -697,6 +697,14 @@
                             },
                             "version": {
                               "type": "integer"
+                            },
+                            "coat_type": {
+                              "type": "string",
+                              "enum": [
+                                "SHORT",
+                                "LONG"
+                              ],
+                              "description": "Required to quote a service priced by pet group. Older pet profiles may lack this field."
                             }
                           },
                           "required": [
@@ -853,6 +861,14 @@
           "care_notes": {
             "type": "string",
             "maxLength": 2000
+          },
+          "coat_type": {
+            "type": "string",
+            "enum": [
+              "SHORT",
+              "LONG"
+            ],
+            "description": "Required to quote a service priced by pet group. Older pet profiles may lack this field."
           }
         },
         "required": [
@@ -895,6 +911,14 @@
           "care_notes": {
             "type": "string",
             "maxLength": 2000
+          },
+          "coat_type": {
+            "type": "string",
+            "enum": [
+              "SHORT",
+              "LONG"
+            ],
+            "description": "Required to quote a service priced by pet group. Older pet profiles may lack this field."
           }
         },
         "required": [],
@@ -966,6 +990,14 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "coat_type": {
+            "type": "string",
+            "enum": [
+              "SHORT",
+              "LONG"
+            ],
+            "description": "Required to quote a service priced by pet group. Older pet profiles may lack this field."
           }
         },
         "required": [

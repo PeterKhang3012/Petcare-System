@@ -1,14 +1,13 @@
 const service = require("../services/auth.service");
-const handle = (method, status, message) => async (req, res, next) => {
+const handle = (action, status, message) => async (req, res, next) => {
   try {
-    const { username, password } = req.body || {};
-    const data = await service[method](username, password);
+    const data = await action(req.body || {});
     res.status(status).json({ success: true, message, data });
   } catch (error) {
     next(error);
   }
 };
 module.exports = {
-  register: handle("register", 201, "Registration successful"),
-  login: handle("login", 200, "Login successful"),
+  register: handle(service.register, 201, "Registration successful"),
+  login: handle(({ username, password }) => service.login(username, password), 200, "Login successful"),
 };

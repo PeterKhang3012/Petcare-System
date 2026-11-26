@@ -27,7 +27,7 @@ if (-not (Test-Path Backend/payment-service/.env)) {
 
 - Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền bốn token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
 - Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Catalog được seed idempotent khi khởi động; Booking lấy báo giá qua HTTP từ Catalog.
-- Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Khi chưa có frontend, để trống `PAYMENT_FRONTEND_RETURN_URL`. Compose mặc định dùng `http://localhost:8080/api/payments/vnpay/return`. Khi triển khai qua HTTPS, đặt `VNPAY_RETURN_URL` trong **`.env` gốc** và đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
+- Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Compose mặc định dùng `http://localhost:8080/api/payments/vnpay/return` và đưa khách về `http://localhost:5173/payments/return`. Nếu dùng frontend tại origin khác, đặt `PAYMENT_FRONTEND_RETURN_URL` trong **`.env` gốc** theo đúng origin đăng nhập. Khi triển khai qua HTTPS, đặt `VNPAY_RETURN_URL` trong **`.env` gốc** và đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
 
 ```powershell
 docker compose config --quiet
@@ -37,7 +37,6 @@ docker compose ps
 
 ## 4. Kiểm tra và test bằng Postman
 
-<<<<<<< HEAD
 | Service | Địa chỉ mặc định | Kiểm tra |
 | --- | --- | --- |
 | Auth | `http://localhost:3001` | Đăng nhập qua `POST /api/auth/login` |
@@ -46,9 +45,6 @@ docker compose ps
 | Catalog | `http://localhost:3004` | `GET /ready` trả 200 |
 | Care | `http://localhost:3006` | `GET /ready` trả 200 |
 | Payment | `http://localhost:8084` | `GET /api/payments/vnpay/return` trả 200 khi chưa có frontend |
-=======
-Docker chỉ publish cổng gateway trên loopback. Dùng `http://localhost:8080` cho cả bốn biến URL trong Postman. Đặt `GATEWAY_HOST_PORT` trong `.env` gốc nếu cần đổi cổng.
->>>>>>> 8f56677fe85c37c99f437d700a5a4be923a3f63d
 
 | Đường dẫn qua gateway | Service |
 | --- | --- |
@@ -73,10 +69,4 @@ docker compose down
 
 `docker compose down` giữ dữ liệu trong các volume.
 
-<<<<<<< HEAD
 Hướng dẫn API, đổi giá, tiếp nhận/nhật ký/bàn giao và kiểm thử: [Catalog và Care](docs/catalog-care.md).
-=======
-## 5. Giao diện người dùng
-
-Mở [hướng dẫn PawStay Frontend](frontend/README.md) để cài đặt, chạy và kiểm thử giao diện React qua API Gateway.
->>>>>>> 8f56677fe85c37c99f437d700a5a4be923a3f63d

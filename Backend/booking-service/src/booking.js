@@ -2,8 +2,11 @@ const { randomUUID } = require('node:crypto');
 const { fail, invalid, id, text, object, fingerprint, requestKey } = require('./platform');
 const { validQuote } = require('./adapters');
 const { transaction, lock } = require('./transactions');
-const { calculate, overlap, liveAllocation, MINUTE, DAY } = require('./time');
+const { calculate, overlap, liveAllocation, careSlots, localDay, MINUTE, DAY } = require('./time');
 const { present } = require('./models');
+const activeBookings = now => ({
+  $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }],
+});
 class BookingService {
   constructor({ connection, models, config, clients, clock = () => new Date() }) {
     Object.assign(this, { connection, models, config, clients, clock });
@@ -55,19 +58,56 @@ class BookingService {
     }
     return booking;
   }
-  async prepare(input, ownerId, correlationId) {
+  async bookingContext(input, ownerId, correlationId) {
     const pet = await this.clients.pet(input.pet_id, ownerId, correlationId);
     const catalog = validQuote(await this.clients.catalog(input.service_id, pet, correlationId), input.service_id);
     if (!catalog.allowed_species.includes(pet.species) || pet.weight_kg < catalog.min_weight_kg || pet.weight_kg > catalog.max_weight_kg) invalid('The service does not support this pet');
-    const quote = calculate(input, catalog, this.config, this.clock());
     const resources = await this.models.Resource.find({ group: catalog.type, species: pet.species, max_weight_kg: { $gte: pet.weight_kg } }).sort({ _id: 1 }).lean();
-    return { pet, catalog, quote, resources };
+    return { pet, catalog, resources };
+  }
+  async prepare(input, ownerId, correlationId) {
+    const context = await this.bookingContext(input, ownerId, correlationId);
+    return { ...context, quote: calculate(input, context.catalog, this.config, this.clock()) };
+  }
+  async petBookingStatuses(ownerId, petIds) {
+    const rows = await this.models.Booking.find({
+      owner_id: ownerId, pet_id: { $in: petIds }, ...activeBookings(this.clock()),
+    }).select('pet_id status -_id').lean();
+    const priority = { PENDING_PAYMENT: 1, CONFIRMED: 2, CHECKED_IN: 3 };
+    const statuses = {};
+    for (const { pet_id, status } of rows) {
+      if (priority[status] > (priority[statuses[pet_id]] ?? 0)) statuses[pet_id] = status;
+    }
+    return statuses;
+  }
+  async dailyAvailability(date, input, ownerId, correlationId) {
+    const now = this.clock();
+    if (date < localDay(now) || date > localDay(new Date(+now + 366 * DAY))) invalid('Invalid care date');
+    const { pet, catalog, resources } = await this.bookingContext(input, ownerId, correlationId);
+    if (catalog.type !== 'CARE' || catalog.duration_minutes !== 60) invalid('A 60-minute care service is required');
+    const slots = careSlots(date);
+    const window = overlap(slots[0].start_at, slots.at(-1).end_at);
+    const [blocks, petBookings] = await Promise.all([
+      this.models.Allocation.find({ resource_id: { $in: resources.map(row => row._id) }, ...liveAllocation(now), ...window }).select('resource_id start_at end_at').lean(),
+      this.models.Booking.find({ pet_id: pet.id, ...activeBookings(now), ...window }).select('start_at end_at').lean(),
+    ]);
+    return { date, slots: slots.map(slot => {
+      const overlaps = row => row.start_at < slot.end_at && row.end_at > slot.start_at;
+      const blocked = new Set(blocks.filter(overlaps).map(row => String(row.resource_id)));
+      const remaining = resources.length - blocked.size;
+      const status = +slot.start_at <= +now || +slot.start_at > +now + 366 * DAY ? 'OUTSIDE_BOOKING_WINDOW' :
+        petBookings.some(overlaps) ? 'PET_BUSY' : remaining ? 'AVAILABLE' : 'FULL';
+      return { ...slot, status, available: status === 'AVAILABLE' ? remaining : 0 };
+    }), holds_resource: false };
   }
   quoteView(prepared) {
-    return { service: prepared.catalog, ...prepared.quote, catalog_mode: this.config.catalogMode, facility_timezone: 'Asia/Ho_Chi_Minh', holds_resource: false };
+    return { service: prepared.catalog, ...prepared.quote, ...(prepared.catalog.price_rule_id ? { pet_version: prepared.pet.version } : {}),
+      catalog_mode: this.config.catalogMode, facility_timezone: 'Asia/Ho_Chi_Minh', holds_resource: false };
   }
   async availability(prepared) {
-    const now = this.clock(), { quote, resources } = prepared;
+    const now = this.clock(), { quote, resources, pet, catalog } = prepared;
+    if (catalog.type === 'CARE' && await this.models.Booking.exists({ pet_id: pet.id, ...overlap(quote.start_at, quote.end_at), ...activeBookings(now) }))
+      return { available: [], holds_resource: false };
     const blocked = await this.models.Allocation.find({ resource_id: { $in: resources.map(r => r._id) }, ...liveAllocation(now), ...overlap(quote.allocation_start_at, quote.allocation_end_at) }).select('resource_id').lean();
     const blockedIds = new Set(blocked.map(a => String(a.resource_id)));
     // Only counts and resource codes: no allocations, customer IDs or pet details.
@@ -80,7 +120,8 @@ class BookingService {
     // All HTTP is completed BEFORE the transaction; callback retries reuse this quote.
     const prepared = await this.prepare(input, ownerId, correlationId);
     const { pet, catalog, quote, resources } = prepared;
-    if (input.expected_price_version !== catalog.price_version_id) fail(409, 'PRICE_CHANGED', 'The price changed; confirm the new quote', { quote: this.quoteView(prepared) });
+    if (input.expected_price_version !== catalog.price_version_id || (catalog.price_rule_id && input.expected_pet_version !== pet.version))
+      fail(409, 'PRICE_CHANGED', 'The price or pet profile changed; confirm the new quote', { quote: this.quoteView(prepared) });
     if (!resources.length) fail(409, 'SLOT_UNAVAILABLE', 'No compatible resource');
     return transaction(this.connection, async session => {
       await lock(this.models, session, pet.id, resources.map(r => r._id));
@@ -88,8 +129,7 @@ class BookingService {
       if (existing) return { booking: present(await this.models.Booking.findById(existing.booking_id).session(session).lean()), replayed: true };
       const now = this.clock();
       if (+quote.start_at <= +now) invalid('The booking must start in the future');
-      const petBusy = await this.models.Booking.exists({ pet_id: pet.id, ...overlap(quote.start_at, quote.end_at),
-        $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }] }).session(session);
+      const petBusy = await this.models.Booking.exists({ pet_id: pet.id, ...overlap(quote.start_at, quote.end_at), ...activeBookings(now) }).session(session);
       if (petBusy) fail(409, 'PET_TIME_CONFLICT', 'This pet already has an overlapping booking');
       let selected;
       for (const resource of resources) {
