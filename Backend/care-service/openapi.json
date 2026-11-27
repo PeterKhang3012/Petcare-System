@@ -1,0 +1,2570 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PawStay Care",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/care/bookings/{bookingId}/check-in": {
+      "post": {
+        "summary": "Check in a booking (STAFF)",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "initial_condition": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "care_instructions": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "belongings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "request_id",
+                  "reason",
+                  "initial_condition"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing request applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Request applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Awaiting Booking synchronization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/bookings/{bookingId}/check-out": {
+      "post": {
+        "summary": "Check out a booking (STAFF)",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "recipient_name": {
+                    "type": "string"
+                  },
+                  "returned_belongings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "request_id",
+                  "reason",
+                  "recipient_name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing request applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Request applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Awaiting Booking synchronization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        },
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit",
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/visits": {
+      "get": {
+        "summary": "List visible visits",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "IN_CARE",
+                "COMPLETED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "booking_id": {
+                                "type": "string"
+                              },
+                              "owner_id": {
+                                "type": "string"
+                              },
+                              "pet_id": {
+                                "type": "string"
+                              },
+                              "snapshot": {
+                                "type": "object",
+                                "additionalProperties": true
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "PENDING",
+                                  "IN_CARE",
+                                  "COMPLETED"
+                                ]
+                              },
+                              "sync_state": {
+                                "type": "string"
+                              },
+                              "request_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "intake": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "nullable": true
+                              },
+                              "handover": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "nullable": true
+                              },
+                              "checked_in_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "completed_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "intake_actor_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "handover_actor_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updated_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "booking_id",
+                              "owner_id",
+                              "pet_id",
+                              "state",
+                              "sync_state"
+                            ]
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "visits",
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/visits/{id}": {
+      "get": {
+        "summary": "Read a visit",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "booking_id": {
+                              "type": "string"
+                            },
+                            "owner_id": {
+                              "type": "string"
+                            },
+                            "pet_id": {
+                              "type": "string"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "IN_CARE",
+                                "COMPLETED"
+                              ]
+                            },
+                            "sync_state": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "intake": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "handover": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "checked_in_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "intake_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "handover_actor_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "booking_id",
+                            "owner_id",
+                            "pet_id",
+                            "state",
+                            "sync_state"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "visit"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/requests/{requestId}": {
+      "get": {
+        "summary": "Read a care request",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "type": "object",
+                          "properties": {
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "enum": [
+                                "CHECK_IN",
+                                "CHECK_OUT"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PENDING",
+                                "SUCCEEDED",
+                                "REJECTED"
+                              ]
+                            },
+                            "result": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "nullable": true
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "completed_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "request_id",
+                            "visit_id",
+                            "action",
+                            "status"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/visits/{id}/logs": {
+      "get": {
+        "summary": "List care logs",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "logs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "visit_id": {
+                                "type": "string"
+                              },
+                              "request_id": {
+                                "type": "string"
+                              },
+                              "activity": {
+                                "type": "string",
+                                "enum": [
+                                  "BATH",
+                                  "FEED",
+                                  "CLEAN",
+                                  "REST",
+                                  "OBSERVE",
+                                  "PREPARE_HANDOVER"
+                                ]
+                              },
+                              "notes": {
+                                "type": "string"
+                              },
+                              "actor_id": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "edits": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updated_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "visit_id",
+                              "request_id",
+                              "activity",
+                              "notes",
+                              "actor_id",
+                              "version",
+                              "edits",
+                              "created_at",
+                              "updated_at"
+                            ]
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "logs",
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Record a care activity (STAFF)",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "activity": {
+                    "type": "string",
+                    "enum": [
+                      "BATH",
+                      "FEED",
+                      "CLEAN",
+                      "REST",
+                      "OBSERVE",
+                      "PREPARE_HANDOVER"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "request_id",
+                  "activity",
+                  "notes"
+                ]
+              },
+              "example": {
+                "request_id": "demo-request-001",
+                "activity": "BATH",
+                "notes": "Completed the scheduled bath."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Log recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "log": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "activity": {
+                              "type": "string",
+                              "enum": [
+                                "BATH",
+                                "FEED",
+                                "CLEAN",
+                                "REST",
+                                "OBSERVE",
+                                "PREPARE_HANDOVER"
+                              ]
+                            },
+                            "notes": {
+                              "type": "string"
+                            },
+                            "actor_id": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "edits": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "visit_id",
+                            "request_id",
+                            "activity",
+                            "notes",
+                            "actor_id",
+                            "version",
+                            "edits",
+                            "created_at",
+                            "updated_at"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "log"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/care/visits/{id}/logs/{logId}": {
+      "patch": {
+        "summary": "Edit a care log (STAFF)",
+        "description": "Send an activity or notes change. expected_version guards against concurrent edits.",
+        "tags": [
+          "Care"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "logId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string",
+                    "enum": [
+                      "BATH",
+                      "FEED",
+                      "CLEAN",
+                      "REST",
+                      "OBSERVE",
+                      "PREPARE_HANDOVER"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "expected_version",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "log": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "visit_id": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "activity": {
+                              "type": "string",
+                              "enum": [
+                                "BATH",
+                                "FEED",
+                                "CLEAN",
+                                "REST",
+                                "OBSERVE",
+                                "PREPARE_HANDOVER"
+                              ]
+                            },
+                            "notes": {
+                              "type": "string"
+                            },
+                            "actor_id": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "edits": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "visit_id",
+                            "request_id",
+                            "activity",
+                            "notes",
+                            "actor_id",
+                            "version",
+                            "edits",
+                            "created_at",
+                            "updated_at"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "log"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Check service liveness",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "live": {
+                          "type": "boolean"
+                        },
+                        "service": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "live",
+                        "service"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Check database readiness",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ready": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ready"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      }
+    }
+  }
+}

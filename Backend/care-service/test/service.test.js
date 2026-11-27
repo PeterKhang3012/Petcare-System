@@ -99,6 +99,7 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
   const arrive = (b, body = intake(), token = tokens.staff) => request(base, `/api/care/bookings/${b.id}/check-in`, { method: 'POST', token, body });
   const depart = (b, body = checkout()) => request(base, `/api/care/bookings/${b.id}/check-out`, staff({ method: 'POST', body }));
   const clean = async b => request(bookingBase, `/api/staff/resources/${b.resource_id}/cleaning-complete`, staff({ method: 'POST', body: { reason: 'Physical cleaning complete' } }));
+<<<<<<< HEAD
   const hold = async ({ future = false, serviceId = 'bath' } = {}) => {
     const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T01:55:00Z`);
     const startDay = new Date(+now + (future ? 7 : 0) * 86400000).toISOString().slice(0, 10);
@@ -107,6 +108,18 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
     assert.equal(q.status, 200, JSON.stringify(q.body));
     const schedule = serviceId === 'boarding' ? { check_in_date: startDay, check_out_date: new Date(Date.parse(startDay) + 86400000).toISOString().slice(0, 10) } : { start_at: `${startDay}T09:00:00+07:00` };
     const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(), body: { pet_id: petId, service_id: serviceId, expected_price_version: q.body.data.quote.price_version_id, expected_pet_version: 1, ...schedule } });
+=======
+  const confirmed = async () => {
+    const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T01:55:00Z`);
+    const petId = randomBytes(12).toString('hex');
+    petRows.set(petId, { id: petId, owner_id: people.alice.id, name: 'Original Mimi', species: 'CAT', coat_type: 'SHORT', weight_kg: 3, care_notes: 'Original care note', version: 1 });
+    const input = { pet_id: petId, service_id: 'bath', start_at: `2030-01-${day}T09:00:00+07:00` };
+    const q = await request(bookingBase, '/api/bookings/quotes', { method: 'POST', token: tokens.alice, body: input });
+    assert.equal(q.status, 200, JSON.stringify(q.body));
+    const quote = q.body.data.quote;
+    const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(),
+      body: { ...input, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version } });
+>>>>>>> 3f8953c382b06d9bc3ec05046e3812c3038e73e8
     assert.equal(made.status, 201, JSON.stringify(made.body)); const b = made.body.data.booking;
     return b;
   };

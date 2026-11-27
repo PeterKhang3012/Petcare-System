@@ -71,6 +71,7 @@ docker compose down
 
 Hướng dẫn API, đổi giá, tiếp nhận/nhật ký/bàn giao và kiểm thử: [Catalog và Care](docs/catalog-care.md).
 
+<<<<<<< HEAD
 ## 5. Đồng hồ demo cho từng booking
 
 Mặc định `PAWSTAY_DEMO_ENABLED=false`. Để trình diễn bằng dữ liệu thử, đặt `PAWSTAY_DEMO_ENABLED=true` và `NODE_ENV=development` trong `.env` gốc. Khi stack đã chạy, áp dụng cấu hình cho Booking/Care:
@@ -89,3 +90,39 @@ Khi chạy service trực tiếp, đặt cùng cờ trong môi trường của c
 Đồng hồ lưu trên booking và tiếp tục chạy sau khi tải lại trang hoặc khởi động lại service. Frontend cập nhật mỗi giây từ mẫu thời gian backend, không gọi API mỗi giây. Giờ đặt gốc, giá, thanh toán và hold 15 phút của các booking khác không đổi. Demo vẫn có thể bị từ chối khi tài nguyên chưa sẵn sàng, đang bảo trì hoặc có xung đột.
 
 Để tắt, đặt cờ về `false` rồi chạy lại lệnh trên. Lượt đã đánh dấu demo giữ timeline/lịch sử và chặn nghiệp vụ mô phỏng mới cho đến khi bật lại; không chuyển ngầm về giờ thật. Nếu yêu cầu Care chưa rõ kết quả, gửi lại đúng phiếu đang chờ. Khi đã nhận từ chối cuối cùng, xử lý nguyên nhân rồi lập yêu cầu mới; không xóa receipt cũ.
+=======
+## 5. Monitoring
+
+Một Prometheus thu thập metrics của sáu service mỗi 15 giây qua mạng Docker. Grafana dùng datasource Prometheus mặc định và tự nạp dashboard **PawStay Service Overview**. Hai service có volume riêng và chạy trong profile tùy chọn `monitoring`.
+
+Đặt `GRAFANA_ADMIN_USER` và `GRAFANA_ADMIN_PASSWORD` trong `.env` gốc. Mật khẩu bắt buộc khi khởi động Grafana. Các biến khởi tạo quản trị áp dụng khi volume Grafana mới được tạo.
+
+```powershell
+docker compose --profile monitoring up -d --build --wait
+```
+
+- [Prometheus](http://localhost:9090) và [trạng thái scrape](http://localhost:9090/targets).
+- [Grafana — PawStay Service Overview](http://localhost:3000/d/pawstay-overview). Dùng bộ lọc **Service** và khoảng thời gian trong thanh công cụ.
+- Express xuất số lượng và thời gian HTTP theo method, route mẫu và status, số request đang xử lý, CPU, bộ nhớ và metrics runtime Node.js.
+- Payment xuất HTTP, JVM heap/non-heap và CPU qua Micrometer. Kiểm tra nội bộ bằng `/actuator/health` và `/actuator/prometheus`.
+- Dashboard hiển thị số service UP/DOWN, lưu lượng, tỷ lệ lỗi 4xx/5xx và P50/P95/P99. Cần tạo lưu lượng và chờ ít nhất hai lần scrape để có dữ liệu cho tốc độ và phân vị.
+
+Prometheus và Grafana mặc định chỉ mở trên loopback. Có thể đổi cổng máy chủ qua `PROMETHEUS_HOST_PORT` và `GRAFANA_HOST_PORT`. Gateway giữ metrics và route nội bộ trong mạng Docker.
+
+## 6. Swagger UI
+
+Khởi động stack rồi chạy `npm ci` và `npm run dev` trong `frontend/`. Mở [Swagger UI](http://localhost:5173/docs) và chọn service ở đầu trang. Bấm **Authorize** để nhập JWT lấy được từ Auth khi thử API yêu cầu đăng nhập. Dùng môi trường thử nghiệm cho các thao tác ghi. API nội bộ và các endpoint kiểm tra sức khỏe riêng của service dùng mạng Docker.
+
+Các backend chỉ phục vụ OpenAPI JSON. Vite chuyển tiếp `/docs-api/*` đến gateway, nơi mỗi đường dẫn được ánh xạ đến đúng service.
+
+Trong Swagger, **Public · Không cần JWT** và **Public · Cần Bearer JWT** là hai nhóm truy cập qua gateway. **Nội bộ · Chỉ trong mạng Docker** gồm endpoint service-to-service và endpoint kiểm tra sức khỏe. Nhóm nội bộ chỉ hiển thị tài liệu, với **Try it out** được tắt.
+
+| Service | Cổng nội bộ | OpenAPI JSON qua frontend | Endpoint OpenAPI nội bộ |
+| --- | ---: | --- | --- |
+| Auth | 3001 | [Auth specification](http://localhost:5173/docs-api/auth) | `/api-docs.json` |
+| Pet | 3002 | [Pet specification](http://localhost:5173/docs-api/pet) | `/api-docs.json` |
+| Booking | 3003 | [Booking specification](http://localhost:5173/docs-api/booking) | `/api-docs.json` |
+| Catalog | 3004 | [Catalog specification](http://localhost:5173/docs-api/catalog) | `/api-docs.json` |
+| Care | 3006 | [Care specification](http://localhost:5173/docs-api/care) | `/api-docs.json` |
+| Payment | 8084 | [Payment specification](http://localhost:5173/docs-api/payment) | `/v3/api-docs` |
+>>>>>>> 3f8953c382b06d9bc3ec05046e3812c3038e73e8

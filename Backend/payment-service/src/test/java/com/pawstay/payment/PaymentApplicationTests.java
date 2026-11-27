@@ -79,7 +79,7 @@ class PaymentApplicationTests {
             var unauthorized = HttpRequest.newBuilder(url.resolve("/api/payments/00000000-0000-0000-0000-000000000001")).build();
             assertEquals(401, http.send(unauthorized, HttpResponse.BodyHandlers.discarding()).statusCode());
             var invalid = HttpRequest.newBuilder(url).header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{\"booking_id\":\"" + BOOKING + "\",\"amount\":1}")).build();
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"booking_id\":\"" + BOOKING + "\",\"policy_accepted\":true,\"amount\":1}")).build();
             assertEquals(400, http.send(invalid, HttpResponse.BodyHandlers.discarding()).statusCode());
         }
     }

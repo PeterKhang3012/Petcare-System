@@ -39,7 +39,7 @@ Trong Postman, với các request POST bên dưới, chọn **Body → raw → J
 | Tạo Pet | `POST {{pet_url}}/api/pets` | Bearer | `{"name":"Mimi","species":"CAT","weight_kg":3.5}` | 201, lưu `data.pet.id` |
 | Báo giá | `POST {{booking_url}}/api/bookings/quotes` | Bearer | `{"pet_id":"{{pet_id}}","service_id":"bath","start_at":"{{start_at}}"}` | 200, lưu `data.quote.price_version_id` |
 | Tạo booking | `POST {{booking_url}}/api/bookings` | Bearer, `Idempotency-Key: booking-demo-001` | `{"pet_id":"{{pet_id}}","service_id":"bath","start_at":"{{start_at}}","expected_price_version":"{{price_version_id}}"}` | 201, lưu `data.booking.id`, trạng thái `PENDING_PAYMENT` |
-| Tạo Payment | `POST {{payment_url}}/api/payments` | Bearer, `Idempotency-Key: payment-demo-001` | `{"booking_id":"{{booking_id}}"}` | 201, lưu `payment_id` và mở URL từ trường `payment_url` trong trình duyệt |
+| Tạo Payment | `POST {{payment_url}}/api/payments` | Bearer, `Idempotency-Key: payment-demo-001` | `{"booking_id":"{{booking_id}}","policy_accepted":true}` | 201, lưu `payment_id` và mở URL từ trường `payment_url` trong trình duyệt |
 | Xem Payment | `GET {{payment_url}}/api/payments/{{payment_id}}` | Bearer |  | 200, kiểm tra `status` và `booking_sync_status` nếu đã có Outbox |
 | Xem Booking | `GET {{booking_url}}/api/bookings/{{booking_id}}` | Bearer |  | 200, kiểm tra `data.booking.status` |
 

@@ -1,5 +1,7 @@
+const { observability } = require('./observability');
 const express = require("express");
 const app = express();
+observability(app, 'auth-service');
 app.use(express.json({ limit: "16kb" }));
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/facility/contact", require("./routes/facility-contact"));

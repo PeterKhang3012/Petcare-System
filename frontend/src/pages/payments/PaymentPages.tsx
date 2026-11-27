@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { PaymentPolicy } from '../../components/PaymentPolicy';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLoad } from '../../hooks/useLoad';
 import { payments } from '../../services';
@@ -75,6 +76,7 @@ function PaymentDetail({ id }: { id: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [policyAccepted, setPolicyAccepted] = useState(location.state?.policyAccepted === true);
   const [resumedUrl, setResumedUrl] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
@@ -84,6 +86,7 @@ function PaymentDetail({ id }: { id: string }) {
   const candidateUrl: unknown = resumedUrl || location.state?.paymentUrl;
   const checkoutUrl = typeof candidateUrl === 'string' && /^https:\/\//i.test(candidateUrl) ? candidateUrl : undefined;
   const storedKey = user && payment && knownPayment(user.id, payment.booking_id) === id ? existingPaymentKey(user.id, payment.booking_id) : null;
+  const canRetry = payment?.status === 'FAILED' && Date.parse(payment.expires_at ?? '') > Date.now();
   const refresh = Boolean(payment && (payment.booking_sync_status === 'PENDING' ||
     payment.status === 'PENDING' && (!payment.expires_at || Date.parse(payment.expires_at) > Date.now())));
   useEffect(() => {
@@ -92,16 +95,16 @@ function PaymentDetail({ id }: { id: string }) {
     return () => window.clearTimeout(timer);
   }, [refresh, result.reload]);
   async function continuePayment(retry: boolean) {
-    if (!payment || !user) return;
+    if (!payment || !user || !policyAccepted || busy) return;
     const key = retry ? 'retry-' + id : storedKey;
     if (!key) return;
     setBusy(true); setError(undefined);
     try {
-      const next = await payments.create(payment.booking_id, key);
+      const next = await payments.create(payment.booking_id, key, policyAccepted);
       if (retry) {
         rememberPaymentKey(user.id, next.booking_id, key);
         rememberPayment(user.id, next.booking_id, next.payment_id);
-        navigate('/payments/' + next.payment_id, { replace: true, state: { paymentUrl: next.payment_url } });
+        navigate('/payments/' + next.payment_id, { replace: true, state: { paymentUrl: next.payment_url, policyAccepted } });
       } else if (next.payment_id === id) {
         setResumedUrl(next.payment_url);
         result.reload();
@@ -118,10 +121,14 @@ function PaymentDetail({ id }: { id: string }) {
       {payment.booking_sync_outcome && <><dt>Kết quả đồng bộ</dt><dd>{payment.booking_sync_outcome}</dd></>}
       </dl>
       {payment.status === 'PENDING' && <p>{pending ? 'Trạng thái được cập nhật khi máy chủ nhận kết quả từ VNPay.' : 'Đã qua thời hạn thanh toán của lịch này. Nếu đã chuyển tiền, hãy kiểm tra lại trạng thái.'}</p>}
+      {(canRetry || (pending && (checkoutUrl || storedKey))) &&
+        <PaymentPolicy accepted={policyAccepted} onChange={setPolicyAccepted} disabled={busy}/>}
       <Feedback error={error}/><div className="actions">
-      {pending && checkoutUrl && <a className="button" href={checkoutUrl}>Thanh toán qua VNPAY</a>}
-      {pending && !checkoutUrl && storedKey && <button disabled={busy} onClick={() => continuePayment(false)}>Lấy lại liên kết VNPay</button>}
-      {payment.status === 'FAILED' && Date.parse(payment.expires_at ?? '') > Date.now() && <button disabled={busy} onClick={() => continuePayment(true)}>Thử thanh toán lại</button>}
+      {pending && checkoutUrl && (policyAccepted
+        ? <a className="button" href={checkoutUrl}>Thanh toán qua VNPAY</a>
+        : <button disabled>Thanh toán qua VNPAY</button>)}
+      {pending && !checkoutUrl && storedKey && <button disabled={busy || !policyAccepted} onClick={() => continuePayment(false)}>Lấy lại liên kết VNPay</button>}
+      {canRetry && <button disabled={busy || !policyAccepted} onClick={() => continuePayment(true)}>Thử thanh toán lại</button>}
       <button className="secondary" onClick={result.reload}>Kiểm tra trạng thái</button></div>
     </section></>)}</Feedback></>;
 }

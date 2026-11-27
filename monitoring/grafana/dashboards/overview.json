@@ -1,0 +1,812 @@
+{
+  "uid": "pawstay-overview",
+  "title": "PawStay Service Overview",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "pawstay"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "System Overview",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "Monitored services",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(up{service=~\"$service\"}) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "UP",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(up{service=~\"$service\"}) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "DOWN",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(1 - up{service=~\"$service\"}) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "HTTP requests",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum (increase(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__range]) or increase(http_server_requests_seconds_count{service=~\"$service\"}[$__range])) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "HTTP errors (4xx and 5xx)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum (increase(pawstay_http_request_duration_seconds_count{service=~\"$service\",status=~\"[45]..\"}[$__range]) or increase(http_server_requests_seconds_count{service=~\"$service\",status=~\"[45]..\"}[$__range])) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Request rate",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "HTTP Monitoring",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "title": "Request rate by service",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Request rate by method",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, method) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{service}} {{method}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Response status codes",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, status) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{service}} {{status}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "HTTP error rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by (service) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\",status=~\"[45]..\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\",status=~\"[45]..\"}[$__rate_interval])) or (0 * sum by (service) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval])))) / sum by (service) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Mean response time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (rate(pawstay_http_request_duration_seconds_sum{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_sum{service=~\"$service\"}[$__rate_interval])) / sum by (service) (rate(pawstay_http_request_duration_seconds_count{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_count{service=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Response latency percentiles",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (service, le) (rate(pawstay_http_request_duration_seconds_bucket{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_bucket{service=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{service}} P50",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(pawstay_http_request_duration_seconds_bucket{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_bucket{service=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{service}} P95",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (service, le) (rate(pawstay_http_request_duration_seconds_bucket{service=~\"$service\"}[$__rate_interval]) or rate(http_server_requests_seconds_bucket{service=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{service}} P99",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "title": "Active HTTP requests",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (pawstay_http_active_requests{service=~\"$service\"})",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "Resource Monitoring",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 17,
+      "title": "JVM heap and non-heap",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, area) (jvm_memory_used_bytes{service=~\"$service\"})",
+          "legendFormat": "{{service}} {{area}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "title": "Process and system CPU",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(process_cpu_seconds_total{service=~\"$service\"}[$__rate_interval])",
+          "legendFormat": "{{service}} process cores",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "process_cpu_usage{service=~\"$service\"}",
+          "legendFormat": "{{service}} process share",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "system_cpu_usage{service=~\"$service\"}",
+          "legendFormat": "{{service}} system share",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "title": "Node.js process resident memory",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_resident_memory_bytes{service=~\"$service\"}",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "title": "Node.js heap usage",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nodejs_heap_size_used_bytes{service=~\"$service\"}",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 46,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 21,
+      "title": "Node.js event loop lag",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nodejs_eventloop_lag_seconds{service=~\"$service\"}",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "title": "Node.js active handles",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pawstay-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nodejs_active_handles_total{service=~\"$service\"}",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "pawstay-prometheus"
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "pawstay-prometheus"
+        },
+        "query": "label_values(up, service)",
+        "definition": "label_values(up, service)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  }
+}
