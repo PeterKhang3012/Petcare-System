@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLoad } from '../../hooks/useLoad';
 import { bookings, pets, staff } from '../../services';
+import { bookingPath } from '../../services/catalog';
 import { Empty, Feedback, Status } from '../../UI/Feedback';
 import { dateTime, label, serviceName } from '../../utils/format';
 import { FacilityContact } from './FacilityContact';
@@ -19,8 +20,11 @@ export function Dashboard() {
     return { bookings: list.bookings, total: list.total, pets: petList.total };
   }, [isStaff]));
   return <>
-    <section className="hero"><div><span className="eyebrow">PAWSTAY</span><h1>Xin chào, {user?.username}</h1><p>{isStaff ? 'Xem lịch đặt và quản lý tài nguyên chăm sóc.' : 'Sắp xếp lịch chăm sóc cho thú cưng của bạn.'}</p>
-    <Link className="button" to={isStaff ? '/staff' : '/bookings/new'}>{isStaff ? 'Mở trang vận hành' : 'Đặt lịch chăm sóc'}</Link></div><div className="paw-print" aria-hidden="true"><i/><i/><i/><i/><b/></div></section>
+    <section className="hero"><div><span className="eyebrow">PAWSTAY</span><h1>Xin chào, {user?.username}</h1><p>{isStaff ? 'Xem lịch đặt và quản lý tài nguyên chăm sóc.' : 'Đặt lịch chăm sóc hoặc lưu trú cho thú cưng của bạn.'}</p>
+    <div className="actions">{isStaff ? <Link className="button" to="/staff">Mở trang vận hành</Link> : <>
+      <Link className="button" to={bookingPath('CARE')}>Đặt lịch chăm sóc</Link>
+      <Link className="button secondary" to={bookingPath('BOARDING')}>Đặt lưu trú</Link>
+    </>}</div></div><div className="paw-print" aria-hidden="true"><i/><i/><i/><i/><b/></div></section>
     <FacilityContact />
     <Feedback {...summary} retry={summary.reload}>{summary.data && <>
       <div className="stats">{summary.data.pets !== undefined && <Link className="panel" to="/pets"><small>Thú cưng đang chăm sóc</small><strong>{summary.data.pets}</strong></Link>}

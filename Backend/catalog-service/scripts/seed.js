@@ -1,10 +1,10 @@
 require('dotenv').config({ path: require('node:path').join(__dirname, '../.env'), quiet: true });
 const { databaseConfig, connect, initialize, replicaReady, transaction } = require('../src/platform');
 const { models } = require('../src/catalog');
+const { stayPrices } = require('./stay-prices');
 // Catalog owns this seed. Runtime never imports Booking's fixture or database.
 const initial = [
-  { service_id: 'bath', name: 'Bath', type: 'CARE', unit: 'SERVICE', duration_minutes: 60, unit_price: 150000 },
-  { service_id: 'boarding', name: 'Overnight boarding', type: 'BOARDING', unit: 'NIGHT', duration_minutes: null, unit_price: 200000 }
+  { service_id: 'bath', name: 'Bath', type: 'CARE', unit: 'SERVICE', duration_minutes: 60, unit_price: 150000 }
 ];
 const bathRules = [
   ...[
@@ -20,23 +20,26 @@ const bathRules = [
   { price_rule_id: 'cat-5', species: 'CAT', min_weight_kg: 5, max_weight_kg: 10, max_inclusive: true, unit_price: 300000 },
 ];
 async function seed(connection, data = models(connection)) {
-  for (const item of initial) await transaction(connection, async session => {
-    const { service_id, unit_price, ...details } = item;
-    const grouped = service_id === 'bath';
+  for (const item of [...initial, ...stayPrices.map(service => ({ ...service, unit: 'DAY' }))]) await transaction(connection, async session => {
+    const { service_id, unit_price, price_rules, ...details } = item;
+    const rules = service_id === 'bath' ? bathRules : price_rules;
+    const grouped = Boolean(rules?.length);
     const existing = await data.Service.findById(service_id).session(session).lean();
     if (existing && !grouped) return;
     const current = existing && await data.Price.findById(existing.current_price_version_id).session(session).lean();
     if (current?.price_rules?.length) return;
-    const priceId = grouped ? 'bath-groups-v1' : `${service_id}-v1`;
-    await data.Price.create([{ _id: priceId, service_id, unit_price: grouped ? bathRules[0].unit_price : unit_price,
-      price_rules: grouped ? bathRules : undefined, previous_price_version_id: current?._id, currency: 'VND',
-      actor_id: 'catalog-seed', reason: grouped ? 'Initial bath price groups' : 'Initial catalog price', created_at: new Date() }], { session });
+    const priceId = service_id === 'bath' ? 'bath-groups-v1' : `${service_id}-v1`;
+    await data.Price.create([{ _id: priceId, service_id, unit_price: rules?.[0].unit_price ?? unit_price,
+      price_rules: rules, previous_price_version_id: current?._id, currency: 'VND',
+      actor_id: 'catalog-seed', reason: grouped ? 'Initial price groups' : 'Initial catalog price', created_at: new Date() }], { session });
     if (existing) {
       await data.Service.updateOne({ _id: service_id }, { $set: { current_price_version_id: priceId } }, { session });
     } else {
-      await data.Service.create([{ _id: service_id, ...details, allowed_species: ['DOG', 'CAT'], min_weight_kg: 0, max_weight_kg: 40, active: true, current_price_version_id: priceId }], { session });
+      await data.Service.create([{ _id: service_id, allowed_species: ['DOG', 'CAT'], min_weight_kg: 0, max_weight_kg: 40, ...details, active: true, current_price_version_id: priceId }], { session });
     }
   });
+  // Preserve the legacy price versions and booking snapshots; new bookings select a room tier.
+  await data.Service.updateOne({ _id: 'boarding', type: 'BOARDING', active: true }, { $set: { active: false } });
 }
 async function main() {
   const connection = await connect(databaseConfig('catalog'));

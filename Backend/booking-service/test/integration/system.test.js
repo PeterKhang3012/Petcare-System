@@ -197,7 +197,8 @@ test('Pet and Booking on authenticated real MongoDB replica set with two Booking
     fakes.state.refundStatus = 200; await Promise.all([first.call('outbox'), second.call('outbox')]);
     assert.equal((await db.collection('outboxes').findOne({ _id: event._id })).status, 'DELIVERED');
     await time('2030-01-19T04:00:00.001Z');
-    assert.equal((await api(`/api/bookings/${late.id}/cancel`, { method: 'POST', key: randomUUID(), body: { reason: 'less than 24 hours' } })).status, 409);
+    assert.equal((await api(`/api/bookings/${late.id}/cancel`, { method: 'POST', key: randomUUID(), body: { reason: 'less than 24 hours' } })).status, 200);
+    assert.equal(await db.collection('outboxes').countDocuments({ 'payload.booking_id': late.id }), 0);
     await time('2030-01-01T02:00:00.000Z');
   });
   await t.test('cancellation and Care check-in cannot both transition the same booking', async () => {

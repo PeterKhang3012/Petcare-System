@@ -43,6 +43,7 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
       JWT_PRIVATE_KEY_PATH: /auth-keys/private.pem
       FACILITY_CONTACT_FILE: /app/data/facility-contact.json
+      BOOKING_BASE_URL: http://booking-service:3003
       JWT_PUBLIC_KEY_PATH: /app/public-keys/auth-public.pem
     volumes:
       - *public-keys
@@ -149,6 +150,8 @@ services:
       PAYMENT_DB_USERNAME: payment_app
       PAYMENT_DB_PASSWORD: ${PAYMENT_MYSQL_PASSWORD:?Set PAYMENT_MYSQL_PASSWORD in the root .env}
       AUTH_SERVICE_URL: http://auth-service:3001
+      VNPAY_REFUND_SERVER_IP: ${VNPAY_REFUND_SERVER_IP:-}
+      BOOKING_TO_PAYMENT_TOKEN: ${BOOKING_TO_PAYMENT_TOKEN:-}
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
       JWT_PUBLIC_KEY_PATH: /app/public-keys/auth-public.pem
       BOOKING_SERVICE_URL: http://booking-service:3003

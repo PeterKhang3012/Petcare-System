@@ -2,7 +2,7 @@ const { baseApp, finishApp, authenticate, requireRole, internalAuth, id, object,
 const { createModels, present } = require('./models');
 const { adapters } = require('./adapters');
 const { supportsTransactions } = require('./transactions');
-const { bookingInput, overlap, DAY } = require('./time');
+const { bookingInput, overlap, liveAllocation, DAY } = require('./time');
 const { BookingService } = require('./booking');
 const { ResourceOperations } = require('./operations');
 const { createWorkers } = require('./workers');
@@ -77,19 +77,44 @@ function createApp({ config, connection, logger, clock, clients = adapters(confi
   app.post('/api/bookings/:id/cancel', async (req, res) => outcome(res, await service.cancel(id(req.params.id), req.user.id, requestKey(req.headers['idempotency-key']), req.body)));
   app.use('/api/staff', requireRole('STAFF'));
   app.get('/api/staff/bookings', async (req, res) => {
-    object(req.query, ['from', 'to', 'page', 'limit']);
+    object(req.query, ['from', 'to', 'page', 'limit', 'group']);
     const from = req.query.from ? timestamp(req.query.from, 'from') : service.clock();
     const to = req.query.to ? timestamp(req.query.to, 'to') : new Date(+from + 7 * DAY);
     if (+to <= +from || +to - +from > 31 * DAY) invalid('Schedule range must be positive and at most 31 days');
     const { page, limit, skip } = pagination(req.query), filter = overlap(from, to);
+    if (req.query.group !== undefined) {
+      if (!['CARE', 'BOARDING'].includes(req.query.group)) invalid('Invalid group');
+      filter['service_snapshot.type'] = req.query.group;
+    }
     const [bookings, total] = await Promise.all([models.Booking.find(filter).sort({ start_at: 1, _id: 1 }).skip(skip).limit(limit).lean(), models.Booking.countDocuments(filter)]);
     const effective = [];
     for (const booking of bookings) effective.push(present(await service.get(booking._id)));
     res.json({ success: true, data: { bookings: effective, page, limit, total } });
   });
-  app.get('/api/staff/bookings/:id', async (req, res) => res.json({ success: true, data: service.staffView(await service.get(id(req.params.id))) }));
+  app.get('/api/staff/bookings/:id', async (req, res) => {
+    const booking = await service.get(id(req.params.id));
+    const resource = await models.Resource.findById(booking.resource_id).lean();
+    res.json({ success: true, data: { ...service.staffView(booking), resource: resource ? present(resource) : null } });
+  });
   app.post('/api/staff/bookings/:id/demo-clock', async (req, res) => res.json({ success: true,
     data: await service.advanceDemo(id(req.params.id), req.user, requestKey(req.headers['idempotency-key']), req.body) }));
+  app.get('/api/staff/bookings/:id/room-options', async (req, res) =>
+    res.json({ success: true, data: { resources: await operations.transferOptions(id(req.params.id)) } }));
+  app.post('/api/staff/bookings/:id/room-transfer', async (req, res) =>
+    res.json({ success: true, data: await operations.transfer(id(req.params.id), req.user.id, requestKey(req.headers['idempotency-key']), req.body) }));
+  app.get('/api/staff/resources/:id/allocations', async (req, res) => {
+    const resourceId = id(req.params.id);
+    if (!await models.Resource.exists({ _id: resourceId })) fail(404, 'NOT_FOUND', 'Resource not found');
+    object(req.query, ['page', 'limit']);
+    const { page, limit, skip } = pagination(req.query);
+    const now = service.clock();
+    const filter = { resource_id: resourceId, ...liveAllocation(now), end_at: { $gt: now } };
+    const [allocations, total] = await Promise.all([
+      models.Allocation.find(filter).sort({ start_at: 1, _id: 1 }).skip(skip).limit(limit).lean(),
+      models.Allocation.countDocuments(filter),
+    ]);
+    res.json({ success: true, data: { allocations: allocations.map(present), page, limit, total } });
+  });
   app.get('/api/staff/resources', async (req, res) => {
     object(req.query, ['page', 'limit', 'group', 'state']); const filter = {};
     if (req.query.group) { if (!['CARE', 'BOARDING'].includes(req.query.group)) invalid('Invalid group'); filter.group = req.query.group; }

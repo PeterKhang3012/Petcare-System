@@ -65,3 +65,9 @@ The worker is enabled by default. Set OUTBOX_ENABLED=false to pause delivery, OU
 The authenticated Payment GET endpoint exposes booking_sync_status and booking_sync_outcome when the payment has an Outbox event. Review REJECTED or DEAD_LETTER records using the reason and event ID before taking operational action.
 
 See [Postman walkthrough](run_tutorial.md) for setup, request bodies, headers and expected responses.
+
+## STAFF transactions and VNPAY Sandbox refunds
+
+Set a distinct `BOOKING_TO_PAYMENT_TOKEN` for Booking and Payment to enable delivery of refund requests, and configure `VNPAY_REFUND_SERVER_IP` for Payment to send the merchant server IP in Sandbox requests. Use Sandbox merchant credentials.
+
+STAFF endpoints under `/api/payments/staff` list transactions and exceptions, run a signed `querydr` for the original payment, and list and confirm refund requests. The amount comes from the verified original payment. Confirmation is recorded before sending a full refund to Sandbox, and a second confirmation cannot resend it. When the refund response is missing, unverified, or pending, the request stays `PROCESSING` for manual reconciliation with VNPAY. Staff cannot edit the amount or set a terminal result.

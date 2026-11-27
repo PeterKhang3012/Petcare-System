@@ -5,10 +5,10 @@ import { Feedback } from './UI/Feedback';
 import { AuthPage } from './pages/auth/AuthPage';
 import { Dashboard, Profile } from './pages/dashboard/Dashboard';
 import { PetDetail, PetList, PetNew } from './pages/pets/PetPages';
-import { BookingNew, BookingPage, BookingsPage } from './pages/bookings/BookingPages';
+import { BookingNew, BookingPage, BookingsPage, LegacyBookingNew } from './pages/bookings/BookingPages';
 import { PaymentLookup, PaymentPage, PaymentReturn } from './pages/payments/PaymentPages';
 import { StaffBooking, StaffPage } from './pages/staff/StaffPages';
-import { CatalogDetail, CatalogPage } from './pages/catalog/CatalogPages';
+import { CatalogDetail, CatalogPage, StayCatalog } from './pages/catalog/CatalogPages';
 import { CarePage, CareRequestPage, CareVisit } from './pages/care/CarePages';
 import type { Role } from './types';
 
@@ -18,7 +18,7 @@ function Protected({ role }: { role?: Role }) {
   const { user, loading, error, retry } = useAuth();
   const location = useLocation();
   if (loading || error) return <div className="workspace"><Feedback loading={loading} error={error} retry={retry}/></div>;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }}/>;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }}/>;
   if (role && user.role !== role) return <section className="panel"><h1>Không có quyền truy cập</h1><p>Trang này dành cho một vai trò khác.</p><Link to="/">Về tổng quan</Link></section>;
   return <Outlet/>;
 }
@@ -36,12 +36,14 @@ export default function App() {
     <Route path="/payments/return" element={<PaymentReturn/>}/>
     <Route element={<Protected/>}><Route element={<Layout/>}>
       <Route index element={<Dashboard/>}/><Route path="profile" element={<Profile/>}/>
-      <Route path="catalog" element={<CatalogPage/>}/><Route path="catalog/:id" element={<CatalogDetail/>}/>
+      <Route path="catalog" element={<CatalogPage/>}/><Route path="catalog/stay" element={<StayCatalog/>}/><Route path="catalog/:id" element={<CatalogDetail/>}/>
       <Route path="care" element={<CarePage/>}/><Route path="care/visits/:id" element={<CareVisit/>}/>
       <Route path="care/requests/:id" element={<CareRequestPage/>}/>
       <Route element={<Protected role="USER"/>}>
         <Route path="pets" element={<PetList/>}/><Route path="pets/new" element={<PetNew/>}/><Route path="pets/:id" element={<PetDetail/>}/>
-        <Route path="bookings" element={<BookingsPage/>}/><Route path="bookings/new" element={<BookingNew/>}/><Route path="bookings/:id" element={<BookingPage/>}/>
+        <Route path="bookings" element={<BookingsPage/>}/><Route path="bookings/new" element={<LegacyBookingNew/>}/>
+        <Route path="bookings/care/new" element={<BookingNew key="CARE" type="CARE"/>}/>
+        <Route path="bookings/boarding/new" element={<BookingNew key="BOARDING" type="BOARDING"/>}/><Route path="bookings/:id" element={<BookingPage/>}/>
         <Route path="payments" element={<PaymentLookup/>}/><Route path="payments/:id" element={<PaymentPage/>}/>
       </Route>
       <Route element={<Protected role="STAFF"/>}><Route path="staff" element={<StaffPage/>}/><Route path="staff/bookings/:id" element={<StaffBooking/>}/></Route>

@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BookingDetails, BookingList } from '../../components/BookingList';
 import { PaymentPolicy } from '../../components/PaymentPolicy';
 import { useLoad } from '../../hooks/useLoad';
 import { bookings, payments, pets } from '../../services';
-import { bookingServices } from '../../services/catalog';
+import { bookingPath, bookingServices, catalog, type CatalogService } from '../../services/catalog';
 import { Empty, Feedback, HistoryList, Pagination, Status } from '../../UI/Feedback';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Booking, BookingInput, Quote } from '../../types';
@@ -20,7 +20,10 @@ export function BookingsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const result = useLoad(useCallback(() => bookings.list(page, status || undefined), [page, status]));
-  return <><header className="page-heading"><h1>Lịch đặt</h1><Link className="button" to="/bookings/new">Đặt lịch chăm sóc</Link></header>
+  return <><header className="page-heading"><h1>Lịch đặt</h1><div className="actions">
+    <Link className="button" to={bookingPath('CARE')}>Đặt lịch chăm sóc</Link>
+    <Link className="button secondary" to={bookingPath('BOARDING')}>Đặt lưu trú</Link>
+  </div></header>
     <div className="toolbar"><label>Trạng thái<select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}>
       <option value="">Tất cả</option>{states.map(value => <option key={value} value={value}>{label(value)}</option>)}
     </select></label></div>
@@ -28,22 +31,35 @@ export function BookingsPage() {
   </>;
 }
 
-export function BookingNew() {
+export function LegacyBookingNew() {
+  const [search] = useSearchParams();
+  const serviceId = search.get('service');
+  const result = useLoad(useCallback(() => serviceId ? catalog.get(serviceId) : Promise.resolve(undefined), [serviceId]));
+  if (!serviceId) return <Navigate to={bookingPath('CARE')} replace/>;
+  if (result.data) return <Navigate to={bookingPath(result.data.service.type, serviceId)} replace/>;
+  return <Feedback {...result} retry={result.reload}/>;
+}
+
+export function BookingNew({ type }: { type: CatalogService['type'] }) {
   const [petPage, setPetPage] = useState(1);
   const petList = useLoad(useCallback(() => pets.list(petPage), [petPage]));
-  const catalog = useLoad(bookingServices);
+  const catalog = useLoad(useCallback(() => bookingServices(type), [type]));
   const [search] = useSearchParams();
   const [selection, setSelection] = useState('');
-  const services = catalog.data ?? [];
+  const [petId, setPetId] = useState('');
+  const pet = petList.data?.pets.find(item => item.id === petId);
+  const boarding = type === 'BOARDING';
+  const services = (catalog.data ?? []).filter(service => !boarding || !pet
+    || service.allowed_species.includes(pet.species) && pet.weight_kg >= service.min_weight_kg
+      && (service.max_weight_inclusive === false ? pet.weight_kg < service.max_weight_kg : pet.weight_kg <= service.max_weight_kg));
   const selected = services.find(service => service.service_id === (selection || search.get('service'))) ?? services[0];
   const serviceId = selected?.service_id ?? '';
+  const daily = selected?.unit === 'DAY';
   const [review, setReview] = useState<{ input: BookingInput; quote: Quote; available: number; key: string }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const retryKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const navigate = useNavigate();
-  const boarding = selected?.type === 'BOARDING';
-  const [petId, setPetId] = useState('');
   const [date, setDate] = useState('');
   const [start, setStart] = useState('');
   const slots = useLoad(useCallback(() => !boarding && serviceId && petId && date
@@ -51,10 +67,11 @@ export function BookingNew() {
   const selectedSlot = slots.data?.slots.find(slot => slot.start_at === start && slot.available > 0);
   async function quote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!boarding && !selectedSlot) return;
+    if (busy || !serviceId || (!boarding && !selectedSlot)) return;
     const form = new FormData(event.currentTarget);
     const input: BookingInput = { pet_id: String(form.get('pet')), service_id: serviceId,
-      ...(boarding ? { check_in_date: String(form.get('checkIn')), check_out_date: String(form.get('checkOut')) } :
+      ...(boarding ? { check_in_date: String(form.get('checkIn')), check_out_date: String(form.get('checkOut')),
+        ...(daily ? { check_in_time: String(form.get('arrivalTime')), check_out_time: String(form.get('departureTime')) } : {}) } :
         { start_at: start }) };
     setError(undefined); setBusy(true); setReview(undefined);
     try {
@@ -88,13 +105,32 @@ export function BookingNew() {
       }
     } finally { setBusy(false); }
   }
-  return <><Link to="/bookings">Danh sách lịch đặt</Link><h1>Đặt lịch chăm sóc</h1>
-    <Feedback {...catalog} retry={catalog.reload}>{catalog.data && (!services.length ? <Empty>Chưa có dịch vụ đang hoạt động.</Empty> :
+  return <><Link to="/bookings">Danh sách lịch đặt</Link><h1>{boarding ? 'Đặt lưu trú' : 'Đặt lịch chăm sóc'}</h1>
+    <Feedback {...catalog} retry={catalog.reload}>{catalog.data && (!catalog.data.length ? <Empty>Chưa có dịch vụ đang hoạt động.</Empty> :
     <Feedback {...petList} retry={petList.reload}>{petList.data && (petList.data.pets.length ? <>
       <form className="panel form-grid" onSubmit={quote} onChange={() => { setReview(undefined); setError(undefined); }} key={petPage}>
         <label>Thú cưng<select name="pet" value={petId} disabled={busy} onChange={event => { setPetId(event.target.value); setStart(''); }} required><option value="">Chọn thú cưng</option>{petList.data.pets.map(pet => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>
-        <label>Dịch vụ<select value={serviceId} disabled={busy} onChange={event => { setSelection(event.target.value); setStart(''); }} required>{services.map(service => <option key={service.service_id} value={service.service_id}>{service.name}</option>)}</select></label>
-        {boarding ? <><label>Ngày nhận thú cưng<input type="date" name="checkIn" required/></label><label>Ngày trả thú cưng<input type="date" name="checkOut" required/></label></> :
+        <label>{boarding ? 'Loại chỗ lưu trú' : 'Dịch vụ chăm sóc'}<select value={serviceId} disabled={busy || !services.length} onChange={event => { setSelection(event.target.value); setStart(''); }} required>{!services.length && <option value="">Không có phòng phù hợp</option>}{services.map(service => <option key={service.service_id} value={service.service_id}>{service.name}</option>)}</select></label>
+        {boarding ? <><label>Ngày nhận thú cưng<input type="date" name="checkIn" min={careDate.format(new Date())} disabled={busy} required/></label><label>Ngày trả thú cưng<input type="date" name="checkOut" min={careDate.format(new Date())} disabled={busy} required/></label>
+          {daily && <>
+            <label>Giờ nhận (GMT+7)<input type="time" name="arrivalTime" min="08:00" max="18:00" disabled={busy} required/></label>
+            <label>Giờ trả (GMT+7)<input type="time" name="departureTime" min="08:00" max="18:00" disabled={busy} required/></label>
+            <section className="full stay-rules" aria-labelledby="stay-rules-title">
+              <h2 id="stay-rules-title">Quy định thời gian và cách tính phí lưu trú</h2>
+              <p>Thời gian lưu trú từ 1–14 đêm. Khách có thể gửi và đón thú cưng trong khung giờ 08:00–18:00.</p>
+              <h3>Ngày gửi thú cưng</h3>
+              <ul>
+                <li>Gửi trước 14:00: tính phí 1 ngày.</li>
+                <li>Gửi từ 14:00 trở đi: tính phí nửa ngày.</li>
+              </ul>
+              <h3>Ngày đón thú cưng</h3>
+              <ul>
+                <li>Đón trước 14:00: tính phí nửa ngày.</li>
+                <li>Đón từ 14:00 trở đi: tính phí 1 ngày.</li>
+              </ul>
+              <p>Những ngày lưu trú giữa ngày gửi và ngày đón được tính phí trọn ngày.</p>
+            </section>
+          </>}</> :
           <>
             <label>Ngày chăm sóc<input type="date" name="date" min={careDate.format(new Date())} value={date} disabled={busy} onChange={event => { setDate(event.target.value); setStart(''); }} required/></label>
             {petId && date && <fieldset className="full care-slots" disabled={busy}>
@@ -109,12 +145,17 @@ export function BookingNew() {
               ))}</div>}</Feedback>
             </fieldset>}
           </>}
-        <div className="full"><button disabled={busy || (!boarding && !selectedSlot)}>Kiểm tra chỗ và báo giá</button></div>
+        <div className="full"><button disabled={busy || !serviceId || (!boarding && !selectedSlot)}>Kiểm tra chỗ và báo giá</button></div>
       </form><Pagination result={petList.data} change={page => { setPetPage(page); setPetId(''); setStart(''); setReview(undefined); }}/></> :
       <Empty>Hãy <Link to="/pets/new">thêm thú cưng</Link> trước khi đặt lịch.</Empty>)}</Feedback>)}</Feedback>
     <Feedback error={error} loading={busy}/>
     {review && <section className="panel"><h2>Báo giá</h2><p className="amount">{money(review.quote.total_amount, review.quote.currency)}</p>
-      <p>{dateTime(review.quote.start_at)} – {dateTime(review.quote.end_at)}</p><p>{review.available ? `Hiện có ${review.available} chỗ phù hợp. Chỗ được giữ sau khi đặt lịch thành công.` : 'Hiện không còn chỗ phù hợp.'}</p>
+      {boarding ? <dl className="details">
+        <dt>Nhận thú cưng</dt><dd>{dateTime(review.quote.start_at)}</dd>
+        <dt>Trả thú cưng</dt><dd>{dateTime(review.quote.end_at)}</dd>
+        {review.quote.nights !== undefined && <><dt>Số đêm</dt><dd>{review.quote.nights}</dd></>}
+        {daily && review.quote.quantity !== undefined && <><dt>Số ngày tính phí</dt><dd>{review.quote.quantity.toLocaleString('vi-VN')}</dd></>}
+      </dl> : <p>{dateTime(review.quote.start_at)} – {dateTime(review.quote.end_at)}</p>}<p>{review.available ? `Hiện có ${review.available} chỗ phù hợp. Chỗ được giữ sau khi đặt lịch thành công.` : 'Hiện không còn chỗ phù hợp.'}</p>
       <button disabled={busy || !review.available} onClick={create}>Xác nhận đặt lịch</button></section>}
   </>;
 }
@@ -138,9 +179,16 @@ function BookingActions({ booking, reload }: { booking: Booking; reload: () => v
     } catch (failure) { setError(failure); }
     finally { setBusy(false); }
   }
+  function isLateCancellation() {
+    return booking.status === 'CONFIRMED' && Date.parse(booking.start_at) - Date.now() < 24 * 60 * 60 * 1000;
+  }
   async function cancel(event: FormEvent) {
     event.preventDefault();
-    if (!reason.trim() || !window.confirm('Bạn muốn hủy lịch này?')) return;
+    if (busy || !reason.trim()) return;
+    const message = isLateCancellation()
+      ? 'Còn dưới 24 giờ trước giờ hẹn. Bạn sẽ không được hoàn tiền nếu hủy. Tiếp tục hủy lịch?'
+      : 'Bạn muốn hủy lịch này?';
+    if (!window.confirm(message)) return;
     const value = reason.trim();
     if (cancelKey.current?.reason !== value) cancelKey.current = { reason: value, key: crypto.randomUUID() };
     setError(undefined); setBusy(true);
@@ -156,7 +204,9 @@ function BookingActions({ booking, reload }: { booking: Booking; reload: () => v
     {paymentId && <div className="actions"><Link className="button secondary" to={'/payments/' + paymentId}>Xem thanh toán</Link></div>}
   {booking.status === 'CANCELLED' && booking.accepted_payment_id && <p className="feedback">Lịch đã hủy. Hãy liên hệ cơ sở để đối soát khoản tiền đã thanh toán.</p>}
   {['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status) && <form className="panel" onSubmit={cancel}>
-    <h2>Hủy lịch</h2><label>Lý do<input maxLength={500} required value={reason} onChange={event => setReason(event.target.value)}/></label>
+    <h2>Hủy lịch</h2>
+    {isLateCancellation() && <p className="feedback">Hủy dưới 24 giờ trước giờ hẹn sẽ không được hoàn tiền.</p>}
+    <label>Lý do<input maxLength={500} required value={reason} onChange={event => setReason(event.target.value)}/></label>
     <button className="secondary" disabled={busy}>Xác nhận hủy lịch</button></form>}</>;
 }
 

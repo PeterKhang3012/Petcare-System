@@ -31,11 +31,29 @@ export const bookings = {
 };
 
 export const staff = {
-  schedule: (page: number, from?: string, to?: string) =>
-    data<Page & { bookings: Booking[] }>(api.get('/staff/bookings', { params: { page, from, to } })),
+  transactions: async (page: number, exceptions: boolean) =>
+    (await api.get<import('../types').StaffTransactions>('/payments/staff/transactions', { params: { page, exceptions } })).data,
+  refunds: async (page: number) =>
+    (await api.get<import('../types').StaffRefunds>('/payments/staff/refund-requests', { params: { page } })).data,
+  reconcile: (id: string) => api.post('/payments/staff/transactions/' + pathId(id) + '/reconcile'),
+  confirmRefund: (id: string) => api.post('/payments/staff/refund-requests/' + pathId(id) + '/confirm'),
+  cancelFacilityBooking: (id: string, reason: string, key: string) =>
+    api.post('/staff/bookings/' + pathId(id) + '/cancel-facility', { reason }, idempotency(key)),
+  cancelPriceGroupBooking: (id: string, input: { reason: string; species: string; weight_kg: number; coat_type: string; customer_agreed: boolean }, key: string) =>
+    api.post('/staff/bookings/' + pathId(id) + '/cancel-price-group', input, idempotency(key)),
+  bookingContact: (id: string) => data<{ contact: { full_name: string | null; phone: string | null } }>(
+    api.get('/auth/staff/bookings/' + pathId(id) + '/contact'),
+  ),
+  schedule: (page: number, from?: string, to?: string, group?: Resource['group']) =>
+    data<Page & { bookings: Booking[] }>(api.get('/staff/bookings', { params: { page, from, to, group } })),
   booking: (id: string) => data<StaffBookingDetails>(api.get('/staff/bookings/' + pathId(id))),
   advanceDemo: (id: string, command: DemoCommand, key: string) =>
     data<StaffBookingDetails>(api.post('/staff/bookings/' + pathId(id) + '/demo-clock', { command }, idempotency(key))),
+  roomOptions: (id: string) => data<{ resources: Resource[] }>(api.get('/staff/bookings/' + pathId(id) + '/room-options')),
+  transferRoom: (id: string, resource_id: string, reason: string, key: string) =>
+    api.post('/staff/bookings/' + pathId(id) + '/room-transfer', { resource_id, reason }, idempotency(key)),
+  allocations: (id: string, page: number) =>
+    data<Page & { allocations: import('../types').ResourceAllocation[] }>(api.get('/staff/resources/' + pathId(id) + '/allocations', { params: { page } })),
   resources: (page: number, group?: string, state?: string) =>
     data<Page & { resources: Resource[] }>(api.get('/staff/resources', { params: { page, group, state } })),
   history: (id: string, page: number) =>

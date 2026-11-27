@@ -63,6 +63,9 @@ small { font-size: .86rem; }
 .panel { border: 1px solid var(--line); background: var(--white); border-radius: .85rem; padding: clamp(1rem, 3vw, 1.65rem); min-width: 0; }
 .panel h2 + *, .panel h3 + *, .panel form + *, .panel dl + * { margin-top: .8rem; }
 .panel h3:not(:first-child) { margin-top: 1.3rem; }
+.stay-price-scroll { overflow-x: auto; margin-bottom: .6rem; }
+.stay-price-table tbody th { width: auto; white-space: nowrap; }
+.stay-price-table thead th { white-space: nowrap; }
 .catalog-price-group + .catalog-price-group { margin-top: 1.5rem; }
 .catalog-price-table { width: 100%; border-collapse: collapse; }
 .catalog-price-table caption { padding: 0 0 .55rem; text-align: left; font-size: 1.1rem; font-weight: 700; }
@@ -104,6 +107,9 @@ select { appearance: none; padding-right: 1.85rem; background-image: linear-grad
 textarea { min-height: 6rem; resize: vertical; }
 .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .full { grid-column: 1 / -1; }
+.stay-rules { display: grid; gap: .7rem; padding: clamp(.85rem, 2vw, 1.25rem); background: #f8faf8; border: 1px solid var(--line); border-radius: .75rem; }
+.stay-rules ul { padding-inline-start: 1.35rem; }
+.stay-rules li + li { margin-top: .25rem; }
 .care-slots { min-width: 0; margin: 0; padding: 0; border: 0; }
 .care-slots legend { margin-bottom: .65rem; padding: 0; font-weight: 650; }
 .care-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .55rem; }
@@ -114,6 +120,8 @@ textarea { min-height: 6rem; resize: vertical; }
 .payment-policy { display: grid; gap: .75rem; margin-block: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .payment-policy ul { padding-inline-start: 1.25rem; }
 .payment-policy label { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; }
+.staff-agreement { display: flex; align-items: flex-start; gap: .65rem; }
+.staff-agreement input { width: 1.15rem; height: 1.15rem; flex: none; }
 .payment-policy input { width: 1.15rem; height: 1.15rem; flex: none; margin: .2rem 0 0; accent-color: var(--green); }
 .care-slot:has(input:disabled) { color: var(--muted); background: #f4f7f4; cursor: default; }
 .auth-shell { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; }

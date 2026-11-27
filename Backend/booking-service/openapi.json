@@ -435,6 +435,16 @@
             }
           },
           {
+            "name": "check_in_time",
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$" }
+          },
+          {
+            "name": "check_out_time",
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$" }
+          },
+          {
             "name": "date",
             "in": "query",
             "description": "Facility date for daily care availability. Send instead of timing parameters.",
@@ -1150,6 +1160,15 @@
         },
         "parameters": [
           {
+            "name": "group",
+            "in": "query",
+            "description": "Filter by the service group on the booking snapshot",
+            "schema": {
+              "type": "string",
+              "enum": ["CARE", "BOARDING"]
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -1375,6 +1394,165 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/staff/bookings/{id}/room-options": {
+      "get": {
+        "summary": "List replacement rooms for a confirmed Stay booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compatible rooms available over the complete allocation"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/staff/bookings/{id}/room-transfer": {
+      "post": {
+        "summary": "Transfer a confirmed Stay booking while preserving price and schedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource_id",
+                  "reason"
+                ],
+                "properties": {
+                  "resource_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{24}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room allocation transferred or request replayed"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/staff/resources/{id}/allocations": {
+      "get": {
+        "summary": "List active resource allocations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated future and ongoing allocations"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -2856,6 +3034,14 @@
           "check_out_date": {
             "type": "string",
             "format": "date"
+          },
+          "check_in_time": {
+            "type": "string",
+            "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$"
+          },
+          "check_out_time": {
+            "type": "string",
+            "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$"
           }
         },
         "required": [
@@ -2863,7 +3049,7 @@
           "service_id"
         ],
         "additionalProperties": false,
-        "description": "CARE requires start_at; BOARDING requires check_in_date and check_out_date. The two modes are mutually exclusive. Any price, duration, end_at, owner or status supplied by the client is rejected.",
+        "description": "CARE requires start_at; BOARDING requires check_in_date and check_out_date. DAY-priced rooms additionally require check_in_time and check_out_time (GMT+7). The two modes are mutually exclusive. Any price, duration, end_at, owner or status supplied by the client is rejected.",
         "oneOf": [
           {
             "required": [
@@ -2920,6 +3106,14 @@
           "check_out_date": {
             "type": "string",
             "format": "date"
+          },
+          "check_in_time": {
+            "type": "string",
+            "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$"
+          },
+          "check_out_time": {
+            "type": "string",
+            "pattern": "^(?:(?:0[89]|1[0-7]):[0-5][0-9]|18:00)$"
           },
           "expected_price_version": {
             "type": "string",
@@ -3011,7 +3205,8 @@
             "type": "string",
             "enum": [
               "SERVICE",
-              "NIGHT"
+              "NIGHT",
+              "DAY"
             ]
           },
           "duration_minutes": {

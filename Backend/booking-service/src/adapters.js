@@ -8,12 +8,16 @@ function validQuote(quote, serviceId) {
     !Array.isArray(quote.allowed_species) || !quote.allowed_species.length || quote.allowed_species.some(s => !['DOG', 'CAT'].includes(s)) ||
     !Number.isFinite(quote.min_weight_kg) || quote.min_weight_kg < 0 || !Number.isFinite(quote.max_weight_kg) || quote.max_weight_kg <= quote.min_weight_kg ||
     (quote.type === 'CARE' && (quote.unit !== 'SERVICE' || !Number.isSafeInteger(quote.duration_minutes) || quote.duration_minutes < 1 || quote.duration_minutes > 600)) ||
-    (quote.type === 'BOARDING' && (quote.unit !== 'NIGHT' || quote.duration_minutes !== null))) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog quote');
+    (quote.type === 'BOARDING' && ((!['NIGHT', 'DAY'].includes(quote.unit) || (quote.unit === 'DAY' && (!quote.room_tier || quote.unit_price % 2 !== 0))) || quote.duration_minutes !== null))) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog quote');
   // Whitelist snapshots even for a remote dependency.
-  const { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species, min_weight_kg, max_weight_kg, price_rule_id } = quote;
+  if (quote.room_tier !== undefined && (quote.type !== 'BOARDING' || !['S', 'M', 'L', 'XL'].includes(quote.room_tier)
+      || typeof quote.max_weight_inclusive !== 'boolean' || quote.allowed_species.length !== 1))
+    fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog room tier');
+  const { room_tier, max_weight_inclusive, service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species, min_weight_kg, max_weight_kg, price_rule_id } = quote;
   if (price_rule_id !== undefined && (typeof price_rule_id !== 'string' || !/^[a-z0-9-]{1,100}$/.test(price_rule_id)))
     fail(503, 'DEPENDENCY_UNAVAILABLE', 'Invalid Catalog price group');
   return { service_id, name, type, price_version_id, unit_price, currency, unit, duration_minutes, allowed_species: [...allowed_species], min_weight_kg, max_weight_kg,
+    ...(room_tier ? { room_tier, max_weight_inclusive } : {}),
     ...(price_rule_id ? { price_rule_id } : {}) };
 }
 function adapters(config) {

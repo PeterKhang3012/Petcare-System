@@ -78,7 +78,16 @@ async function browserFlow() {
     await page.getByRole('button', { name: 'Lưu hồ sơ' }).click();
     await page.getByText('4.5 kg', { exact: true }).waitFor();
     await page.getByRole('link', { name: 'Lịch đặt', exact: true }).click();
-    await page.getByRole('link', { name: 'Đặt lịch chăm sóc' }).click();
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Lưu trú', exact: true }).click();
+    await page.waitForURL('**/bookings/boarding/new');
+    await page.getByRole('heading', { name: 'Đặt lưu trú' }).waitFor();
+    await page.getByLabel('Ngày nhận thú cưng').waitFor();
+    await page.getByLabel('Ngày trả thú cưng').waitFor();
+    assert.equal(await page.getByLabel('Ngày chăm sóc').count(), 0);
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Chăm sóc', exact: true }).click();
+    await page.waitForURL('**/bookings/care/new');
+    await page.getByLabel('Ngày chăm sóc').waitFor();
+    assert.equal(await page.getByLabel('Ngày nhận thú cưng').count(), 0);
     await page.locator('select[name="pet"]').selectOption(petId);
     await page.getByLabel('Ngày chăm sóc').fill(day(3));
     await page.getByRole('radio', { name: /^09:00/ }).check();
@@ -138,7 +147,14 @@ async function browserFlow() {
       await page.getByRole('button', { name: 'Tài nguyên', exact: true }).click();
       await page.getByRole('button', { name: 'CARE-01', exact: true }).click();
       await page.getByRole('heading', { name: 'Lịch sử tài nguyên' }).waitFor();
-      report('Giao diện STAFF mở được trang vận hành và lịch sử tài nguyên');
+      await page.getByRole('button', { name: 'Giao dịch', exact: true }).click();
+      await page.getByRole('heading', { name: 'Giao dịch thanh toán' }).waitFor();
+      await page.getByRole('button', { name: 'Hoàn tiền', exact: true }).click();
+      await page.getByRole('heading', { name: 'Yêu cầu hoàn tiền' }).waitFor();
+      await page.goto(base + '/staff/bookings/' + bookingId);
+      await page.getByRole('heading', { name: 'Liên hệ khách hàng' }).waitFor();
+      await page.getByRole('link', { name: customer.phone, exact: true }).waitFor();
+      report('Giao diện STAFF mở được vận hành, giao dịch, hoàn tiền và liên hệ theo lịch đặt');
     }
     assert.deepEqual(errors, []);
     report('Trình duyệt đăng ký, đăng nhập, sửa thú cưng, đặt lịch, bảo vệ trang, tải lại phiên, bố cục 390 px và đăng xuất');
@@ -187,6 +203,18 @@ if (process.env.PAWSTAY_TEST_STAFF_USERNAME && process.env.PAWSTAY_TEST_STAFF_PA
   const staff = { token: staffToken };
   await check('GET', '/staff/bookings', 200, staff);
   await check('GET', '/staff/bookings/' + bookingId, 200, staff);
+  const contactPath = '/auth/staff/bookings/' + bookingId + '/contact';
+  assert.deepEqual((await check('GET', contactPath, 200, staff)).data.contact, {
+    full_name: customer.full_name, phone: customer.phone,
+  });
+  await check('GET', contactPath, 403, { token });
+  const transactionPath = '/payments/staff/transactions';
+  const refundPath = '/payments/staff/refund-requests';
+  await check('GET', transactionPath, 200, staff);
+  await check('GET', transactionPath + '?exceptions=true', 200, staff);
+  await check('GET', refundPath, 200, staff);
+  await check('GET', transactionPath, 403, { token });
+  await check('GET', refundPath, 403, { token });
   const resource = (await check('GET', '/staff/resources', 200, staff)).data.resources[0];
   const path = '/staff/resources/' + resource.id;
   const item = (await check('POST', path + '/maintenance', 201, { ...staff, body: {
@@ -266,7 +294,7 @@ if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
 
   const newPet = (await check('POST', '/pets', 201, { body: { name: 'Kiểm thử VNPay', species: 'CAT', coat_type: 'SHORT', weight_kg: 4 }, token })).data.pet;
   async function newAttempt(index) {
-    const request = { pet_id: newPet.id, service_id: 'boarding', check_in_date: day(index), check_out_date: day(index + 1) };
+    const request = { pet_id: newPet.id, service_id: 'stay-cat-s', check_in_date: day(index), check_out_date: day(index + 1), check_in_time: '15:00', check_out_time: '10:00' };
     const quote = (await check('POST', '/bookings/quotes', 200, { body: request, token })).data.quote;
     const next = (await check('POST', '/bookings', 201, { body: { ...request, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version },
       token, key: suffix + '-boarding-' + index })).data.booking;
@@ -291,6 +319,21 @@ if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
   assert.equal(lateValue.status, 'SUCCEEDED');
   assert.equal(lateValue.booking_sync_status, 'REJECTED');
   assert.equal(lateValue.booking_sync_outcome, 'BOOKING_CANCELLED');
+  if (process.env.PAWSTAY_TEST_VERIFY_REFUND_OUTBOX === 'true') {
+    const staffToken = await login({ username: process.env.PAWSTAY_TEST_STAFF_USERNAME, password: process.env.PAWSTAY_TEST_STAFF_PASSWORD });
+    const refundDeadline = Date.now() + 15000;
+    let refunds;
+    do {
+      refunds = (await check('GET', '/payments/staff/refund-requests', 200, { token: staffToken })).refunds
+        .filter(item => item.payment_id === late.payment_id);
+      if (!refunds.length) await wait(1000);
+    } while (!refunds.length && Date.now() < refundDeadline);
+    assert.equal(refunds.length, 1);
+    assert.equal(refunds[0].status, 'REQUESTED');
+    assert.equal(refunds[0].amount, late.amount);
+    await check('POST', '/payments/staff/refund-requests/' + refunds[0].event_id + '/confirm', 403, { token });
+    report('Thanh toán đến muộn tạo đúng một yêu cầu hoàn toàn phần và chỉ STAFF có thể xác nhận');
+  }
   assert.equal((await check('GET', '/bookings/' + late.booking_id, 200, { token })).data.booking.status, 'CANCELLED');
   report('IPN test báo thất bại giữ booking chờ; IPN lỗi đến sau thành công bị bỏ qua; IPN muộn không mở lại booking đã hủy');
 } else {

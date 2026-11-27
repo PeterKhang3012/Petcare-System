@@ -41,7 +41,16 @@ test('Catalog transactions and live Booking contract on a real replica set', { s
     const { validQuote } = require('../../booking-service/src/adapters'); assert.equal(validQuote(q.body.data.quote, 'bath').unit_price, 200000);
     assert.equal((await request('/internal/catalog/quotes', { method: 'POST', body: { service_id: 'bath', species: 'CAT', weight_kg: 3 } })).status, 401);
     assert.equal((await request('/internal/catalog/quotes', { method: 'POST', internal: true, body: { service_id: 'bath', species: 'CAT', weight_kg: '3' } })).status, 400);
-    assert.equal((await request('/api/catalog/services/boarding')).body.data.service.duration_minutes, null);
+    assert.equal((await request('/api/catalog/services/boarding')).status, 404);
+    const room = (await request('/api/catalog/services/stay-dog-m')).body.data.service;
+    assert.equal(room.duration_minutes, null);
+    assert.equal(room.unit, 'DAY');
+    assert.equal(room.room_tier, 'M');
+    const stay = (pet) => quote({ service_id: 'stay-dog-m', coat_type: undefined, ...pet });
+    assert.equal(validQuote((await stay({ species: 'DOG', weight_kg: 8 })).body.data.quote, 'stay-dog-m').unit_price, 110000);
+    assert.equal((await stay({ species: 'DOG', weight_kg: 15 })).status, 400);
+    assert.equal((await stay({ species: 'CAT', weight_kg: 8 })).status, 400);
+    assert.equal((await stay({ service_id: 'stay-cat-m', species: 'CAT', weight_kg: 10 })).body.data.quote.unit_price, 120000);
     const service = (await request('/api/catalog/services/bath')).body.data.service;
     assert.equal(service.active, true); assert.equal(service.current_price_version_id, service.price_version_id);
     assert.equal(service.price_rules.length, 10);

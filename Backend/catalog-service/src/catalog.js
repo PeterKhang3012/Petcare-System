@@ -8,8 +8,9 @@ function models(connection) {
     max_inclusive: Boolean, unit_price: Number,
   }, { _id: false });
   const service = new Schema({ _id: String, name: { type: String, required: true }, type: { type: String, enum: ['CARE', 'BOARDING'], required: true },
-    allowed_species: [{ type: String, enum: ['DOG', 'CAT'] }], min_weight_kg: Number, max_weight_kg: Number,
-    unit: { type: String, enum: ['SERVICE', 'NIGHT'] }, duration_minutes: { type: Number, default: null }, active: { type: Boolean, default: true }, current_price_version_id: { type: String, required: true }
+    allowed_species: [{ type: String, enum: ['DOG', 'CAT'] }], min_weight_kg: Number, max_weight_kg: Number, max_weight_inclusive: Boolean,
+    room_tier: { type: String, enum: ['S', 'M', 'L', 'XL'] },
+    unit: { type: String, enum: ['SERVICE', 'NIGHT', 'DAY'] }, duration_minutes: { type: Number, default: null }, active: { type: Boolean, default: true }, current_price_version_id: { type: String, required: true }
   }, { versionKey: false, strict: 'throw' });
   service.index({ active: 1, type: 1, _id: 1 });
   const version = new Schema({ _id: String, service_id: { type: String, required: true, immutable: true },
@@ -39,7 +40,7 @@ class Catalog {
     if (!price.price_rules?.length) return view;
     if (!pet) return { ...view, price_rules: price.price_rules };
     const { species, weight_kg, coat_type } = pet;
-    if (!coat_type) fail(400, 'PET_COAT_REQUIRED', 'Update the pet profile with its coat type');
+    if (!coat_type && service.type === 'CARE') fail(400, 'PET_COAT_REQUIRED', 'Update the pet profile with its coat type');
     const matching = price.price_rules.filter(rule => rule.species === species &&
       (!rule.coat_type || rule.coat_type === coat_type) &&
       weight_kg >= rule.min_weight_kg &&
@@ -55,6 +56,7 @@ class Catalog {
     return transaction(this.connection, async session => {
       const service = await this.data.Service.findOne({ _id: serviceId, active: true }).session(session).lean();
       if (!service) fail(404, 'NOT_FOUND', 'Active service not found');
+      if (service.unit === 'DAY' && unitPrice % 2 !== 0) fail(400, 'VALIDATION_ERROR', 'Daily Stay price must be divisible by 2 VND');
       if (service.current_price_version_id !== expected) fail(409, 'PRICE_VERSION_CONFLICT', 'Reload the current price version before updating');
       const old = await this.data.Price.findById(expected).session(session).lean();
       if (!old || old.service_id !== serviceId) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Price data is not ready');

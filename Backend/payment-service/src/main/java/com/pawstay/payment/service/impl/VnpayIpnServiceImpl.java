@@ -45,7 +45,19 @@ public class VnpayIpnServiceImpl implements VnpayIpnService {
             return VnpayIpnResponse.INVALID_CHECKSUM;
         }
 
-        String reference = parameters.getFirst("vnp_TxnRef");
+        return recordGatewayResult(parameters.getFirst("vnp_TxnRef"), parameters.getFirst("vnp_Amount"),
+                parameters.getFirst("vnp_ResponseCode"), parameters.getFirst("vnp_TransactionStatus"),
+                parameters.getFirst("vnp_TransactionNo"));
+    }
+
+    @Override
+    @Transactional
+    public void applyVerifiedQuerySuccess(String reference, String amount, String transactionNo) {
+        recordGatewayResult(reference, amount, "00", "00", transactionNo);
+    }
+
+    private VnpayIpnResponse recordGatewayResult(String reference, String amount, String responseCode,
+                                                 String transactionStatus, String transactionNo) {
         if (reference == null || !reference.matches("[A-Za-z0-9]{1,100}")) {
             return VnpayIpnResponse.NOT_FOUND;
         }
@@ -56,7 +68,6 @@ public class VnpayIpnServiceImpl implements VnpayIpnService {
             return VnpayIpnResponse.NOT_FOUND;
         }
         PaymentAttempt attempt = found.get();
-        String amount = parameters.getFirst("vnp_Amount");
         if (amount == null || !amount.matches("[0-9]{1,12}")
                 || Long.parseLong(amount) != Math.multiplyExact(attempt.getAmount(), 100L)) {
             return VnpayIpnResponse.INVALID_AMOUNT;
@@ -65,9 +76,6 @@ public class VnpayIpnServiceImpl implements VnpayIpnService {
             return VnpayIpnResponse.ALREADY_RECORDED;
         }
 
-        String responseCode = parameters.getFirst("vnp_ResponseCode");
-        String transactionStatus = parameters.getFirst("vnp_TransactionStatus");
-        String transactionNo = parameters.getFirst("vnp_TransactionNo");
         if (responseCode == null || !responseCode.matches("[0-9]{2}")
                 || (transactionNo != null && !transactionNo.matches("[0-9]{1,32}"))) {
             return VnpayIpnResponse.RETRY;

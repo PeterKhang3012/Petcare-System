@@ -5,6 +5,8 @@ function createModels(connection) {
   const resource = new Schema({
     code: { type: String, unique: true, required: true }, group: { type: String, enum: ['CARE', 'BOARDING'], required: true },
     species: [{ type: String, enum: ['DOG', 'CAT'] }], max_weight_kg: { type: Number, required: true },
+    room_tier: { type: String, enum: ['S', 'M', 'L', 'XL'] }, max_weight_inclusive: Boolean,
+    dimensions_cm: { type: [Number], default: undefined },
     state: { type: String, enum: ['READY', 'OCCUPIED', 'CLEANING', 'OUT_OF_SERVICE'], default: 'READY' },
     occupied_booking_id: { type: Schema.Types.ObjectId, default: null }, schedule_version: { type: Number, default: 0 }
   }, timestamps);

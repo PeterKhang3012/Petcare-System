@@ -120,7 +120,8 @@
                               "type": "string",
                               "enum": [
                                 "SERVICE",
-                                "NIGHT"
+                                "NIGHT",
+                                "DAY"
                               ]
                             },
                             "duration_minutes": {
@@ -335,7 +336,8 @@
                                 "type": "string",
                                 "enum": [
                                   "SERVICE",
-                                  "NIGHT"
+                                  "NIGHT",
+                                  "DAY"
                                 ]
                               },
                               "duration_minutes": {
@@ -573,7 +575,8 @@
                               "type": "string",
                               "enum": [
                                 "SERVICE",
-                                "NIGHT"
+                                "NIGHT",
+                                "DAY"
                               ]
                             },
                             "duration_minutes": {

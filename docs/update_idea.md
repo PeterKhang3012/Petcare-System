@@ -36,11 +36,11 @@ Phiên bản đồ án sử dụng hai vai trò: Chủ thú cưng và Nhân viê
 
 ## 3.1 Phạm vi nghiệp vụ
 
-Phiên bản đầu phục vụ một cơ sở và hai nhóm thú cưng là chó, mèo. Dịch vụ gồm tắm, vệ sinh, cắt tỉa và lưu trú qua đêm.
+Phiên bản đầu phục vụ một cơ sở và hai nhóm thú cưng là chó, mèo. Danh mục khởi tạo có dịch vụ tắm và các hạng phòng lưu trú. Vệ sinh và cắt tỉa ngoài dịch vụ tắm cần bảng giá riêng trước khi mở đặt lịch.
 
 Mỗi booking dành cho một thú cưng và một dịch vụ chăm sóc hoặc một lượt lưu trú. Khách thanh toán toàn bộ trước khi booking được xác nhận. Hệ thống sử dụng một cổng thanh toán sandbox, dự kiến VNPAY.
 
-Đặt lịch chăm sóc được tính theo khung giờ cố định 60 phút. Đặt lưu trú được tính theo số đêm, tối thiểu một đêm. Cả hai hình thức thanh toán trước 100%. Giá chăm sóc được xác định theo dịch vụ, loài, cân nặng và loại lông; giá lưu trú theo loại chỗ và số đêm.
+Đặt lịch chăm sóc được tính theo khung giờ cố định 60 phút. Lưu trú cho đặt từ 1 đến 14 đêm, với giờ gửi và đón từ 08:00 đến 18:00 (GMT+7). Cả hai hình thức thanh toán trước 100%. Giá chăm sóc dựa trên dịch vụ, loài, cân nặng và loại lông. Lưu trú áp dụng đơn giá theo loài, cân nặng, hạng phòng và số ngày tính phí theo mốc 14:00.
 
 Giao diện tập trung vào luồng chính của Chủ thú cưng và Nhân viên. Dữ liệu cập nhật bằng polling khi màn hình đang mở; chu kỳ đề xuất là 15 giây.
 
@@ -66,9 +66,9 @@ Các chức năng sau chưa thuộc tiêu chí nghiệm thu của phiên bản �
 
 - Khám chữa bệnh chuyên sâu, camera trực tiếp và SMS.
 
-- Hoàn tiền tự động qua cổng thanh toán.
+- Hoàn tiền không cần STAFF duyệt, đối chiếu tự động kết quả cuối của giao dịch hoàn tiền, và hoàn tiền một phần.
 
-- Dịch vụ bổ sung trong kỳ lưu trú và danh sách chờ tự động.
+- Dịch vụ bổ sung trong kỳ lưu trú, gia hạn, phụ phí quá giờ, danh sách chờ tự động và quản lý thêm/xóa phòng trên web.
 
 - Quản lý nhân sự, ca làm việc, phân quyền trên web và lập lịch thay đổi giá trong tương lai.
 
@@ -81,6 +81,8 @@ Chủ thú cưng được đăng ký, đăng nhập và quản lý hồ sơ thú
 ## 4.2 Nhân viên
 
 Nhân viên được xem lịch phục vụ tại cơ sở, tiếp nhận thú cưng, ghi nhật ký, xác nhận bàn giao và cập nhật tình trạng vận hành của tài nguyên. Nhân viên được xem thông tin giao dịch cần thiết, yêu cầu đối chiếu và theo dõi quá trình xử lý ngoại lệ. Nhân viên được xem họ tên và số điện thoại của khách có booking liên quan để liên hệ phục vụ.
+
+STAFF được xem yêu cầu hoàn tiền và xác nhận gửi VNPAY Sandbox. Số tiền lấy từ giao dịch gốc đã được xác minh. Trạng thái cuối dựa trên phản hồi đã xác minh từ VNPAY.
 
 Nhân viên không được tự cấp quyền, tạo thêm tài khoản nhân viên, sửa giá đã chốt của booking hoặc ghi đè kết quả thanh toán. Nhân viên được ủy quyền chỉ cập nhật bảng giá trong Catalog; quyền này không cho phép sửa lịch sử booking hoặc kết quả giao dịch.
 
@@ -96,6 +98,8 @@ Quyền UPDATE_SERVICE_PRICE là quyền nghiệp vụ bổ sung trong vai trò 
 | Tạo booking trực tuyến                 | Cho thú cưng của mình                     | Ngoài phạm vi bản đầu                                |
 | Thanh toán                             | Booking của mình                          | Xem và yêu cầu đối chiếu                             |
 | Hủy booking                            | Theo chính sách                           | Theo chính sách; xử lý ngoại lệ có lý do và dấu vết  |
+| Xác nhận yêu cầu hoàn tiền             | Không                                     | Có, số tiền theo giao dịch gốc                       |
+| Điều chuyển phòng                      | Không                                     | Có, cho lịch xác nhận đủ điều kiện                   |
 | Check-in và check-out                  | Không                                     | Có, theo điều kiện                                   |
 | Ghi nhật ký chăm sóc                   | Không                                     | Có                                                   |
 | Xem nhật ký                            | Lượt phục vụ của mình                     | Lượt phục vụ tại cơ sở                               |
@@ -126,6 +130,21 @@ Tình trạng thực tế được đề xuất như sau:
 
 Tình trạng hiện tại được quản lý riêng với lịch đặt trong tương lai. Một chỗ đang có thú cưng vẫn có thể nhận booking cho thời gian sau, nếu khoảng đặt mới không xung đột và có đủ thời gian chuẩn bị.
 
+Dữ liệu khởi tạo gồm 8 vị trí Care (`CARE-01` đến `CARE-08`) và 8 phòng Stay.
+
+| Phòng | Số phòng | Giới hạn cân nặng | Kích thước tham khảo (cm) |
+|---|---:|---|---|
+| DOG-S-01 | 1 | Dưới 5 kg | 60 × 50 × 70 |
+| DOG-M-01 | 1 | Dưới 15 kg | 80 × 60 × 70 |
+| DOG-L-01 | 1 | Dưới 20 kg | 100 × 70 × 90 |
+| DOG-XL-01 | 1 | Tối đa 40 kg | 150 × 120 × 150 |
+| CAT-S-01, CAT-S-02 | 2 | Dưới 5 kg | 60 × 50 × 70 |
+| CAT-M-01, CAT-M-02 | 2 | Tối đa 10 kg | 80 × 60 × 90 |
+
+Mỗi tài nguyên chỉ phục vụ một thú cưng tại một thời điểm. Khi nâng cấp dữ liệu, seed đổi mã trên bản ghi phòng cũ để giữ ID, phân bổ, trạng thái và giá booking đã chốt.
+
+STAFF có thể điều chuyển booking Stay đã xác nhận và chưa check-in, có hạng phòng trong snapshot, sang phòng cùng loài, đủ cân nặng, cùng hạng hoặc cao hơn và còn khả dụng trong toàn bộ khoảng phân bổ. Backend kiểm tra trùng lịch trong transaction, lưu phòng cũ, phòng mới, thời điểm, lý do và người thực hiện. Booking giữ nguyên mã, thời gian, trạng thái và giá.
+
 Khi check-out, tài nguyên chuyển sang CLEANING. Nhân viên xác nhận hoàn tất vệ sinh trước khi chuyển về READY. Hệ thống không cho đánh dấu tài nguyên đang có lượt phục vụ thành sẵn sàng để tiếp nhận thêm.
 
 Khi tạo khoảng tạm ngừng, hệ thống kiểm tra các booking bị ảnh hưởng. Trường hợp xung đột phải được giải quyết trước khi áp dụng, thay vì âm thầm làm mất chỗ của khách đã được xác nhận.
@@ -140,7 +159,36 @@ Giá được tính ở máy chủ theo phiên bản do Catalog cung cấp khi l
 
 Với dịch vụ chăm sóc, hệ thống phân bổ một vị trí trong khoảng thời gian cần thiết. Mỗi vị trí đại diện cho một suất phục vụ mà cơ sở đã chuẩn bị đủ năng lực vận hành. Mỗi lịch chăm sóc chiếm đúng một khung 60 phút, gồm chuẩn bị và vệ sinh. Giờ hoạt động 08:00–18:00, nghỉ 12:00–13:00 (giờ địa phương). Chín khung mỗi ngày: 08:00–09:00, 09:00–10:00, 10:00–11:00, 11:00–12:00, 13:00–14:00, 14:00–15:00, 15:00–16:00, 16:00–17:00, 17:00–18:00. Backend tự cấp vị trí phù hợp và kiểm tra lại khả dụng trong transaction khi tạo booking; không nhận giờ tùy ý, giờ đã qua hoặc khung ngoài lịch. Nếu phục vụ kéo dài, không tiếp nhận lượt mới trên vị trí chưa READY; nhân viên xử lý ngoại lệ.
 
-Với lưu trú, hệ thống cấp một chỗ phù hợp trong toàn bộ khoảng nhận đến trả, có xét thời gian vệ sinh hoặc chuẩn bị.
+Với lưu trú, khách chọn thú cưng, hạng phòng và ngày giờ gửi, đón. Backend phân phòng theo loài, cân nặng và hạng đã chọn. Khoảng phân bổ có thêm thời gian chuẩn bị theo cấu hình và 60 phút vệ sinh sau giờ đón. Việc đổi trạng thái vật lý sang READY vẫn cần xác nhận hoàn tất vệ sinh.
+
+**Quy định thời gian và cách tính phí lưu trú**
+
+Thời gian lưu trú từ 1–14 đêm. Khách có thể gửi và đón thú cưng trong khung giờ 08:00–18:00 (GMT+7).
+
+| Thời điểm | Ngày gửi | Ngày đón |
+|---|---:|---:|
+| Trước 14:00 | 1 ngày | 0,5 ngày |
+| Từ 14:00 trở đi | 0,5 ngày | 1 ngày |
+
+Những ngày lưu trú giữa ngày gửi và ngày đón được tính phí trọn ngày. Nếu `N` là số đêm, số ngày tính phí bằng `(N − 1) + phí ngày gửi + phí ngày đón`, trong đó hai thành phần cuối là hệ số ngày trong bảng. Tổng tiền bằng đơn giá/ngày nhân số ngày tính phí. Ví dụ chó 8 kg ở phòng M, gửi 15:00 và đón 16:00 hôm sau, tính 1,5 ngày × 110.000 VND = 165.000 VND.
+
+**Dog Stay (VND/ngày, gồm thức ăn cơ bản)**
+
+| Hạng | Dưới 2 kg | 2–dưới 5 kg | 5–dưới 10 kg | 10–dưới 15 kg | 15–dưới 20 kg | 20–40 kg |
+|---|---:|---:|---:|---:|---:|---:|
+| S | 70.000 | 80.000 | — | — | — | — |
+| M | 90.000 | 100.000 | 110.000 | 120.000 | — | — |
+| L | 120.000 | 130.000 | 140.000 | 150.000 | 160.000 | — |
+| XL | 210.000 | 220.000 | 230.000 | 240.000 | 250.000 | 300.000 |
+
+**Cat Stay (VND/ngày, gồm thức ăn cơ bản)**
+
+| Hạng | Dưới 5 kg | 5–10 kg |
+|---|---:|---:|
+| S | 80.000 | — |
+| M | 100.000 | 120.000 |
+
+Dấu “—” chỉ nhóm cân nặng ngoài phạm vi phục vụ của hạng phòng. Đơn giá lưu trú cập nhật qua Catalog phải là số chẵn theo VND để nửa ngày luôn cho số tiền nguyên.
 
 Booking được giữ chỗ trong 15 phút để chờ thanh toán. Khách có thể xem booking, thời hạn giữ chỗ, kết quả thanh toán và điều kiện hủy.
 
@@ -166,7 +214,7 @@ Bảng giá tắm cho mèo:
 | Dưới 5 kg    | 200.000       |
 | 5 đến 10 kg  | 300.000       |
 
-Mèo trên 10 kg chưa hỗ trợ đặt lịch trực tuyến.
+Mèo trên 10 kg chưa hỗ trợ đặt lịch tắm hoặc lưu trú trực tuyến.
 
 Cân nặng phải lớn hơn 0; các khoảng không chồng lấn. Mọi nhóm chăm sóc dùng cùng thời lượng 60 phút. Các dịch vụ khác cần seed bảng giá riêng, không mặc định dùng giá tắm.
 
@@ -194,7 +242,15 @@ Timeout không được tự động coi là giao dịch thất bại. Hệ th�
 
 Nếu booking đã hết hạn hoặc chỗ đã được cấp lại, hệ thống vẫn ghi nhận giao dịch thành công nhưng không tự khôi phục booking cũ. Trường hợp này được chuyển sang danh sách ngoại lệ để xử lý.
 
-Bản đầu quản lý yêu cầu hoàn tiền và bằng chứng xử lý thủ công. Trạng thái yêu cầu hoàn tiền được theo dõi riêng với trạng thái giao dịch thanh toán. Hủy đúng hạn hoặc cơ sở không thể cung cấp dịch vụ: hoàn 100%. Hủy muộn hoặc NO_SHOW: không hoàn theo chính sách đề xuất. Sai lệch nhóm giá khi tiếp nhận: hủy và hoàn 100% thủ công nếu khách đồng ý đặt lại hoặc không tiếp tục; không thu chênh lệch trong bản đầu. Chính sách này phải hiển thị trước thanh toán.
+Khách xác nhận đã đọc và đồng ý chính sách hủy và hoàn tiền trước khi thanh toán. Payment yêu cầu `policy_accepted: true` khi tạo giao dịch.
+
+Khách được hủy booking chưa thanh toán hoặc đã xác nhận nhưng chưa check-in. Booking giải phóng phân bổ. Với giao dịch đã thanh toán, hủy khi còn ít nhất 24 giờ trước lịch hẹn sẽ tạo yêu cầu hoàn 100% trong Outbox. Hủy dưới 24 giờ vẫn được phép và không hoàn tiền. Giao diện cảnh báo trường hợp này trước khi khách xác nhận.
+
+Booking chuyển yêu cầu sang Payment khi có `PAYMENT_BASE_URL` và token `BOOKING_TO_PAYMENT_TOKEN` khớp giữa hai service. Trên cấu hình Compose hiện tại, Booking chưa nhận hai biến này, vì vậy yêu cầu đủ điều kiện vẫn chờ trong Outbox và chưa xuất hiện ở mục Hoàn tiền của STAFF. Khi đã nhận yêu cầu, Payment kiểm tra giao dịch gốc và số tiền, chống tạo trùng, rồi chờ STAFF xác nhận gửi VNPAY Sandbox. Payment cần `VNPAY_REFUND_SERVER_IP` để gửi yêu cầu.
+
+Trạng thái `05`, `06`, timeout hoặc phản hồi chưa xác minh giữ yêu cầu ở `PROCESSING` để đối chiếu thủ công. Hệ thống không tự gửi lại yêu cầu hoàn. Kết quả cuối dựa trên phản hồi VNPAY đã xác minh.
+
+Nghiệp vụ đã chốt nhưng backend hiện tại còn thiếu luồng tự tạo yêu cầu hoàn 100% khi thanh toán thành công đến sau khi booking hết hạn hoặc bị hủy trước xác nhận thanh toán. API STAFF hủy do lỗi cơ sở hoặc sai lệch nhóm giá cũng cần tích hợp lại trước khi đưa vào tiêu chí nghiệm thu.
 
 **Kết quả nghiệp vụ:** xác định được giao dịch đã được kiểm chứng và đồng bộ kết quả sang Booking một cách có thể phục hồi.
 
@@ -229,12 +285,12 @@ Hồ sơ thú cưng cung cấp dữ liệu đầu vào cho đặt lịch và ch�
 | BR03   | Giữ chỗ tối đa 15 phút kể từ khi tạo booking                                                                                                                                                                                                                                          |
 | BR04   | Giá tính tại backend và lưu bằng số nguyên VND                                                                                                                                                                                                                                        |
 | BR05   | Thanh toán toàn bộ trước khi xác nhận booking                                                                                                                                                                                                                                         |
-| BR06   | Lưu trú tính theo số đêm, tối thiểu một đêm                                                                                                                                                                                                                                           |
-| BR07   | Khoảng phân bổ phải xét thời gian chuẩn bị hoặc vệ sinh                                                                                                                                                                                                                               |
+| BR06 | Lưu trú 1–14 đêm, gửi và đón 08:00–18:00 (GMT+7), tính phí ngày gửi và ngày đón theo mốc 14:00. |
+| BR07 | Stay chừa 60 phút vệ sinh sau giờ đón. Phòng chỉ về READY khi nhân viên xác nhận vệ sinh xong. |
 | BR08   | Không cấp trùng tài nguyên trong các khoảng thời gian xung đột                                                                                                                                                                                                                        |
 | BR09   | Booking chưa thanh toán có thể được hủy để giải phóng chỗ                                                                                                                                                                                                                             |
 | BR10   | Khách được hủy booking CONFIRMED trước check-in; nếu còn ít nhất 24 giờ thì hoàn 100%, nếu ít hơn 24 giờ thì không hoàn.                                                                                                                                                              |
-| BR11   | Hủy đủ điều kiện tạo yêu cầu hoàn tiền; việc hoàn tất yêu cầu cần bằng chứng xử lý                                                                                                                                                                                                    |
+| BR11 | Hủy đủ điều kiện tạo yêu cầu hoàn toàn phần. STAFF xác nhận gửi VNPAY và Payment xác minh kết quả. |
 | BR12   | Đổi lịch trong bản đầu thực hiện bằng hủy hợp lệ rồi tạo booking mới                                                                                                                                                                                                                  |
 | BR13   | Check-in yêu cầu booking đã xác nhận và tài nguyên thực tế sẵn sàng                                                                                                                                                                                                                   |
 | BR14   | Booking đã check-in không được khách tự hủy                                                                                                                                                                                                                                           |
@@ -247,8 +303,8 @@ Hồ sơ thú cưng cung cấp dữ liệu đầu vào cho đặt lịch và ch�
 | BR21   | Payment thu theo tổng tiền đã chốt của Booking; không lấy giá mới từ Catalog để sửa giao dịch                                                                                                                                                                                         |
 | BR22   | Giá là số nguyên VND lớn hơn 0; cập nhật từ phiên bản giá đã cũ phải bị từ chối để tránh ghi đè                                                                                                                                                                                       |
 | BR23   | Giá chăm sóc theo nhóm dịch vụ, loài, cân nặng, loại lông; thời lượng cố định 60 phút; lưu snapshot khi tạo booking.                                                                                                                                                                  |
-| BR24   | Xác minh đặc điểm thực tế trước check-in; sai nhóm giá thì hủy và đặt lại, không sửa giá cũ.                                                                                                                                                                                          |
-| BR25   | Quá hạn đến mà chưa check-in: NO_SHOW và giải phóng phân bổ; không hoàn tiền theo chính sách đề xuất.                                                                                                                                                                                 |
+| BR24 | Xác minh đặc điểm thực tế trước check-in là quy tắc nghiệp vụ. API hủy do sai nhóm giá cần tích hợp lại. |
+| BR25 | NO_SHOW và giải phóng phân bổ khi khách đến muộn là quy tắc dự kiến. Worker hiện tại chưa chuyển booking sang NO_SHOW. |
 | BR26   | Hủy đúng hạn hoặc lỗi cơ sở hoàn 100%; hủy muộn không hoàn. Sai lệch nhóm giá được hoàn 100% thủ công theo chính sách riêng.                                                                                                                                                          |
 | BR27   | Mèo trên 10 kg không được đặt lịch tắm trực tuyến; cân nặng phải dương và nhóm giá không chồng lấn.                                                                                                                                                                                   |
 | BR28   | Chăm sóc chỉ đặt theo 9 khung 60 phút từ 08:00–12:00 và 13:00–18:00, gồm chuẩn bị/vệ sinh; backend tự cấp tài nguyên và kiểm tra lại khả dụng khi tạo booking. Không áp dụng cho lưu trú.                                                                                             |
@@ -257,7 +313,7 @@ Hồ sơ thú cưng cung cấp dữ liệu đầu vào cho đặt lịch và ch�
 
 Thời điểm được lưu theo UTC và chuyển sang giờ Việt Nam khi hiển thị. Ngày lưu trú và giờ nhận, trả được diễn giải theo lịch của cơ sở.
 
-Điều kiện hết hạn phải được kiểm tra khi xử lý yêu cầu, kể cả khi worker chưa kịp cập nhật trạng thái. Một booking đã quá thời hạn giữ chỗ không được tiếp tục xác nhận chỉ vì tác vụ nền chạy chậm. Worker đánh dấu NO_SHOW cho booking CONFIRMED chưa check-in sau giờ hẹn chăm sóc 15 phút; lưu trú dùng mốc giờ nhận đã đặt cộng 60 phút (giả định demo cần thống nhất). Giải phóng phân bổ còn lại trong cùng transaction, không đổi trạng thái tài nguyên thực tế nếu không có lượt phục vụ. API check-in cũng kiểm tra hạn này và khóa booking để tránh đua với worker.
+Backend kiểm tra hạn giữ chỗ khi xử lý yêu cầu. Worker chuyển booking chưa thanh toán quá hạn sang EXPIRED và giải phóng phân bổ. API check-in hiện kiểm tra cửa sổ thời gian đã cấu hình và dùng transaction khi đổi trạng thái. NO_SHOW tự động và mốc NO_SHOW riêng cho Stay còn trong kế hoạch.
 
 ## 6.2 Trạng thái booking
 
@@ -269,7 +325,7 @@ Thời điểm được lưu theo UTC và chuyển sang giờ Việt Nam khi hi�
 | COMPLETED       | Đã bàn giao, hoàn tất                                          |
 | CANCELLED       | Đã hủy                                                         |
 | EXPIRED         | Đã hết hạn giữ chỗ                                             |
-| NO_SHOW         | Không đến trong thời gian cho phép; giải phóng phân bổ còn lại |
+| NO_SHOW         | Dự kiến cho trường hợp không đến trong thời gian cho phép |
 
 Các chuyển trạng thái chính:
 
@@ -281,7 +337,7 @@ Các chuyển trạng thái chính:
 
 - CONFIRMED sang CANCELLED khi đáp ứng chính sách hủy. Hủy muộn không hoàn; ngoại lệ lỗi cơ sở hoặc sai lệch nhóm giá áp dụng chính sách riêng.
 
-- CONFIRMED sang CHECKED_IN khi tiếp nhận hợp lệ. CONFIRMED sang NO_SHOW khi quá hạn đến và chưa check-in.
+- CONFIRMED sang CHECKED_IN khi tiếp nhận hợp lệ. Chuyển CONFIRMED sang NO_SHOW là luồng dự kiến.
 
 - CHECKED_IN sang COMPLETED khi bàn giao.
 
@@ -293,7 +349,7 @@ Thanh toán có ba trạng thái cơ bản: PENDING, SUCCEEDED và FAILED. PENDI
 
 Thông báo đến muộn hoặc gửi lại không được làm mất kết quả thành công đã được kiểm chứng.
 
-Yêu cầu hoàn tiền có vòng đời riêng, đề xuất gồm REQUESTED, PROCESSING, COMPLETED và REJECTED. Tạo yêu cầu không đồng nghĩa đã hoàn tiền.
+Yêu cầu hoàn tiền có vòng đời riêng gồm REQUESTED, PROCESSING, COMPLETED và REJECTED. Tạo yêu cầu không đồng nghĩa đã hoàn tiền.
 
 ## 6.4 Chính sách cập nhật bảng giá
 
@@ -335,7 +391,7 @@ Docker Compose được sử dụng để định nghĩa và chạy các thành 
 | Auth        | auth_db             | Tài khoản, hai vai trò, quyền UPDATE_SERVICE_PRICE và phiên đăng nhập; username duy nhất, họ tên, số điện thoại, đăng ký và cập nhật thông tin liên hệ có kiểm tra quyền. |
 | Pet         | pet_db              | Hồ sơ thú cưng và thông tin chủ sở hữu; cân nặng và loại lông                                                                                                             |
 | Catalog     | catalog_db          | Danh mục, thời lượng, điều kiện dịch vụ, phiên bản giá và lịch sử cập nhật giá; nhóm giá theo đặc điểm; chăm sóc cố định 60 phút                                          |
-| Booking     | booking_db          | Tài nguyên, khoảng tạm ngừng, booking, phân bổ, bản sao giá và vòng đời phục vụ; snapshot đặc điểm, NO_SHOW; sinh và kiểm tra khung chăm sóc 60 phút                      |
+| Booking     | booking_db          | Tài nguyên, khoảng tạm ngừng, booking, phân bổ, bản sao giá và vòng đời phục vụ; snapshot đặc điểm, công thức giá Stay, điều chuyển phòng và kiểm tra khung chăm sóc 60 phút                      |
 | Payment     | payment_db          | Lần thử thanh toán, kết quả, đối chiếu, yêu cầu hoàn tiền và thông báo cần đồng bộ                                                                                        |
 | Care        | care_db             | Phiếu tiếp nhận, nhật ký và thông tin bàn giao; xác minh đặc điểm trước check-in                                                                                          |
 
@@ -351,7 +407,7 @@ Booking thực hiện kiểm tra và cấp phát trong transaction. Phương án
 
 Không chỉ kiểm tra khả dụng tại frontend hoặc thực hiện chuỗi đọc rồi ghi bằng SELECT thông thường. MySQL lưu ý rằng SELECT thông thường không bảo vệ đầy đủ cho trường hợp đọc dữ liệu rồi cập nhật liên quan \[4\].
 
-Các luồng tạo, hủy, hết hạn và điều chỉnh khả dụng phải tuân theo cùng quy tắc phối hợp dữ liệu. Việc ngăn trùng thời gian của cùng thú cưng cũng được kiểm soát trong Booking. Luồng NO_SHOW cũng sử dụng khóa và transaction tương tự luồng hủy/check-in.
+Các luồng tạo, hủy, hết hạn và điều chỉnh khả dụng phải tuân theo cùng quy tắc phối hợp dữ liệu. Việc ngăn trùng thời gian của cùng thú cưng cũng được kiểm soát trong Booking. Luồng NO_SHOW dự kiến dùng khóa và transaction tương tự luồng hủy và check-in.
 
 ## 7.4 Đồng bộ Payment với Booking
 
@@ -407,13 +463,13 @@ Booking lưu service_id, price_version_id, unit_price, quantity hoặc nights, t
 
 - Danh mục dịch vụ, giá và điều kiện áp dụng. Hiển thị bảng giá theo nhóm, giá tương ứng với thú cưng đã chọn và thời lượng chăm sóc cố định 60 phút.
 
-- Chọn ngày và khung giờ chăm sóc còn trống (60 phút); không nhập giờ tùy ý. Lưu trú giữ cách chọn thời gian hiện hành. Tạo booking và hiển thị lỗi nếu khung vừa hết chỗ.
+- Chọn ngày và khung giờ chăm sóc còn trống (60 phút); không nhập giờ tùy ý. Lưu trú cho chọn ngày giờ gửi, đón và lọc hạng phòng theo thú cưng. Trang danh mục gom các hạng phòng vào thẻ Stay, hiển thị cả bảng giá Dog Stay và Cat Stay. Nút Đặt dịch vụ chuyển sang trang Đặt lưu trú. Biểu mẫu hiển thị khung quy định giờ và cách tính phí, báo giá hiển thị cả số đêm và số ngày tính phí. Tạo booking và hiển thị lỗi nếu khung vừa hết chỗ.
 
 - Danh sách, chi tiết và thời hạn giữ chỗ.
 
 - Thanh toán và theo dõi kết quả.
 
-- Hủy booking theo điều kiện. Hiển thị chính sách hoàn tiền, hủy muộn và NO_SHOW trước thanh toán.
+- Hủy booking theo điều kiện. Hiển thị chính sách hủy và hoàn tiền trước thanh toán, yêu cầu khách tích đồng ý và cảnh báo khi hủy dưới 24 giờ.
 
 - Xem lịch sử và nhật ký chăm sóc.
 
@@ -421,9 +477,9 @@ Booking lưu service_id, price_version_id, unit_price, quantity hoặc nights, t
 
 - Đăng nhập bằng tài khoản được khởi tạo sẵn.
 
-- Lịch đến, đang phục vụ và dự kiến bàn giao.
+- Lịch chăm sóc và vệ sinh, lịch lưu trú là hai mục riêng trong Vận hành.
 
-- Tình trạng tài nguyên và khoảng tạm ngừng.
+- Tài nguyên tách danh sách vị trí chăm sóc và vệ sinh với phòng lưu trú. Mỗi tài nguyên có trạng thái, lịch phân bổ và lịch bảo trì. STAFF có thể xác nhận vệ sinh và điều chuyển phòng đủ điều kiện.
 
 - Phiếu tiếp nhận và thao tác check-in. Có bước xác minh cân nặng, loài, loại lông và xử lý sai lệch nhóm giá. Hiển thị họ tên và số điện thoại chủ thú cưng từ Auth qua API có kiểm tra quyền.
 
@@ -431,7 +487,9 @@ Booking lưu service_id, price_version_id, unit_price, quantity hoặc nights, t
 
 - Phiếu bàn giao và check-out.
 
-- Danh sách giao dịch cần đối chiếu và yêu cầu hoàn tiền.
+- Khi bật `PAWSTAY_DEMO_ENABLED` trong môi trường phát triển, STAFF có thể đưa đồng hồ nghiệp vụ của một booking đủ điều kiện đến giờ hẹn hoặc thời điểm bàn giao để trình diễn. Đồng hồ này áp dụng theo từng booking.
+
+- Mục Giao dịch cho xem danh sách, lọc ngoại lệ và yêu cầu đối chiếu giao dịch gốc. Mục Hoàn tiền hiển thị yêu cầu, số tiền và trạng thái, với thao tác xác nhận gửi VNPAY cho STAFF.
 
 - Lịch sử thao tác vận hành liên quan.
 
@@ -444,6 +502,8 @@ Màn hình đổi giá hiển thị giá cũ, giá mới, lý do và bước xá
 Các màn hình cần thể hiện rõ trạng thái đang xử lý, lỗi có thể thử lại và trường hợp cần nhân viên xử lý. Không hiển thị kết quả thanh toán thành công chỉ dựa vào dữ liệu trên URL trình duyệt.
 
 # 9 Kiểm thử và tiêu chí nghiệm thu
+
+Các ca cần bao phủ thêm gồm mốc 13:59/14:00 và giới hạn 1–14 đêm, biên cân nặng từng hạng phòng, giữ nguyên booking đang ở khi đổi mã phòng, điều chuyển chống trùng lịch, hủy đúng mốc 24 giờ và hủy muộn không tạo hoàn tiền. Các ca NO_SHOW và hoàn tự động cho thanh toán đến muộn chờ hoàn thiện backend.
 
 | **Tình huống**                                                                                                                  | **Kết quả cần đạt**                                                                                                      |
 |---------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
@@ -473,7 +533,7 @@ Các màn hình cần thể hiện rõ trạng thái đang xử lý, lỗi có t
 | Chó 5, 10, 20, 40 kg; mèo 5, 10 kg                                                                                              | Mỗi mốc khớp đúng một nhóm giá; mèo trên 10 kg bị từ chối đặt tắm.                                                       |
 | Đổi cân nặng/loại lông sau báo giá                                                                                              | Yêu cầu xác nhận lại nếu nhóm hoặc đặc điểm thay đổi; booking cũ giữ snapshot.                                           |
 | Sai nhóm giá khi check-in                                                                                                       | Không tiếp nhận; ghi lý do, hủy và hoàn theo chính sách, đặt lại nếu khách đồng ý.                                       |
-| Quá hạn đến hoặc check-in đua với NO_SHOW                                                                                       | Chỉ một chuyển trạng thái hợp lệ; NO_SHOW giải phóng phân bổ, không hoàn.                                                |
+| Quá hạn đến hoặc check-in đua với NO_SHOW                                                                                       | Ca dự kiến sau khi hoàn thiện NO_SHOW. Chỉ một chuyển trạng thái hợp lệ và NO_SHOW không hoàn tiền.                                                |
 | Hủy đúng hạn, hủy muộn, lỗi cơ sở                                                                                               | Tạo yêu cầu hoàn 100% đúng trường hợp; hủy muộn không hoàn.                                                              |
 | Khung giờ chăm sóc không hợp lệ (08:15, 12:00, 18:00 hoặc đã qua)                                                               | Từ chối tại backend; không tạo booking hoặc phân bổ.                                                                     |
 | Hai khách cùng chọn khung cuối còn chỗ; dịch vụ kéo dài                                                                         | Chỉ một booking được cấp vị trí cuối; không check-in lượt sau nếu tài nguyên chưa READY.                                 |
@@ -532,7 +592,7 @@ Lộ trình dùng các mốc tuần tương đối để nhóm sắp xếp theo 
 | Care yêu cầu Booking | Booking quyết định chuyển trạng thái, chống đua với hủy và cập nhật tài nguyên                                                                            | Care lưu phiếu/yêu cầu theo request_id; gọi API, đối chiếu và phục hồi; giao diện hiển thị đang đồng bộ        |
 | Quy ước chung        | Cùng chốt ID, UTC, số nguyên VND, trạng thái, định dạng lỗi và xác thực API nội bộ                                                                        | Cùng chốt ví dụ request/response; 401/403 cho xác thực/quyền, 409 cho xung đột và PRICE_CHANGED                |
 | Báo giá và xác minh  | Pet cung cấp đặc điểm; Booking lưu snapshot, kiểm tra hạn đến và NO_SHOW                                                                                  | Catalog trả nhóm giá và thời lượng chăm sóc 60 phút; Care xác minh thực tế; Payment xử lý hoàn theo chính sách |
-| Khung giờ chăm sóc   | Booking cung cấp API GET /bookings/availability?date=YYYY-MM-DD&pet_id=...&service_id=... (đề xuất); trả các khung còn chỗ, kiểm tra lại khi tạo booking. | Catalog trả thời lượng chăm sóc 60 phút; Care kiểm tra giờ hẹn và tài nguyên thực tế trước tiếp nhận.          |
+| Khung giờ chăm sóc   | Booking cung cấp API GET /bookings/availability?date=YYYY-MM-DD&pet_id=...&service_id=...; trả các khung còn chỗ, kiểm tra lại khi tạo booking. | Catalog trả thời lượng chăm sóc 60 phút; Care kiểm tra giờ hẹn và tài nguyên thực tế trước tiếp nhận.          |
 
 Booking là nguồn quyết định trạng thái booking và tổng tiền đã chốt. Catalog là nguồn quyết định bảng giá. Payment là nguồn kết quả giao dịch đã xác minh. Care là nguồn dữ liệu phiếu và nhật ký. Mỗi bên cung cấp API của mình và không đọc hoặc sửa database của bên kia.
 
@@ -568,7 +628,7 @@ Booking là nguồn quyết định trạng thái booking và tổng tiền đã
 
 ## 11.2 Kịch bản trình diễn chính
 
-Khách tạo hồ sơ mèo, chọn hai đêm lưu trú và nhận mức giá từ hệ thống. Booking giữ một chỗ phù hợp trong thời hạn thanh toán. Sau khi Payment xác minh thành công và Booking xác nhận, nhân viên tiếp nhận, ghi tình trạng ban đầu và cập nhật nhật ký. Chủ theo dõi quá trình trên web. Nhân viên bàn giao, hoàn tất booking và chuyển chỗ sang chờ vệ sinh. Demo thêm chó 7 kg lông dài đặt tắm khung 09:00–10:00 giá 250.000 VND, thanh toán trước 100%, xác minh tại check-in; thử booking không đến để minh họa NO_SHOW và giải phóng chỗ.
+Khách tạo hồ sơ mèo, chọn hai đêm lưu trú và nhận mức giá từ hệ thống. Booking giữ một chỗ phù hợp trong thời hạn thanh toán. Sau khi Payment xác minh thành công và Booking xác nhận, nhân viên tiếp nhận, ghi tình trạng ban đầu và cập nhật nhật ký. Chủ theo dõi quá trình trên web. Nhân viên bàn giao, hoàn tất booking và chuyển chỗ sang chờ vệ sinh. Demo thêm chó 7 kg lông dài đặt tắm khung 09:00–10:00 giá 250.000 VND, thanh toán trước 100%, xác minh tại check-in; trình diễn điều chuyển một lịch Stay đã xác nhận và xác nhận hoàn tất vệ sinh.
 
 ## 11.3 Kịch bản kỹ thuật trọng tâm
 

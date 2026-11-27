@@ -49,6 +49,14 @@ public class AuthClient {
     record Response(boolean success, Data data) {}
 
     public String requireCustomer(String authorization) {
+        return requireRole(authorization, "USER", "Customer role required");
+    }
+
+    public String requireStaff(String authorization) {
+        return requireRole(authorization, "STAFF", "Staff role required");
+    }
+
+    private String requireRole(String authorization, String role, String message) {
         if (authorization == null || !authorization.matches("(?i)Bearer [^\\s]+")) {
             throw unauthorized();
         }
@@ -84,8 +92,8 @@ public class AuthClient {
                 || !("USER".equals(user.role()) || "STAFF".equals(user.role()))) {
             throw unavailable();
         }
-        if (!"USER".equals(user.role())) {
-            throw new PaymentException(HttpStatus.FORBIDDEN, "Customer role required");
+        if (!role.equals(user.role())) {
+            throw new PaymentException(HttpStatus.FORBIDDEN, message);
         }
         return user.id();
     }

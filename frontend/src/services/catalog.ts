@@ -15,10 +15,12 @@ export interface CatalogService {
   service_id: string;
   name: string;
   type: 'CARE' | 'BOARDING';
+  room_tier?: import('../types').RoomTier;
+  max_weight_inclusive?: boolean;
   allowed_species: ('DOG' | 'CAT')[];
   min_weight_kg: number;
   max_weight_kg: number;
-  unit: 'SERVICE' | 'NIGHT';
+  unit: 'SERVICE' | 'NIGHT' | 'DAY';
   duration_minutes: number | null;
   price_version_id: string;
   unit_price: number;
@@ -46,11 +48,16 @@ export const catalog = {
     data<{ price: PriceVersion }>(api.patch('/catalog/services/' + pathId(id) + '/price', input)),
 };
 
-export async function bookingServices() {
-  const first = await catalog.list(1);
+export function bookingPath(type: CatalogService['type'], serviceId?: string) {
+  const path = type === 'BOARDING' ? '/bookings/boarding/new' : '/bookings/care/new';
+  return serviceId ? path + '?service=' + pathId(serviceId) : path;
+}
+
+export async function bookingServices(type: CatalogService['type']) {
+  const first = await catalog.list(1, { type });
   const services = [...first.services];
   for (let page = 2; page <= Math.ceil(first.total / first.limit); page++) {
-    services.push(...(await catalog.list(page)).services);
+    services.push(...(await catalog.list(page, { type })).services);
   }
   return services;
 }

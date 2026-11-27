@@ -29,5 +29,6 @@ export function Pagination({ result, change }: { result: Page; change: (page: nu
 
 export function HistoryList({ rows }: { rows: import('../types').History[] }) {
   if (!rows.length) return <Empty>Chưa có lịch sử.</Empty>;
-  return <ul className="timeline">{rows.map(row => <li key={row.id}><strong>{label(row.action)}</strong><small>{new Date(row.at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{row.reason && <p>{row.reason}</p>}</li>)}</ul>;
+  return <ul className="timeline">{rows.map(row => <li key={row.id}><strong>{row.action === 'ROOM_TRANSFERRED' ? 'Điều chuyển phòng' : label(row.action)}</strong>
+    {row.action === 'ROOM_TRANSFERRED' && <p>{row.from} → {row.to}</p>}<small>{new Date(row.at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{row.reason && <p>{row.reason}</p>}</li>)}</ul>;
 }

@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class PaymentExceptionHandler {
@@ -25,7 +26,8 @@ public class PaymentExceptionHandler {
         return reply(exception.status(), exception.getMessage(), request);
     }
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class})
     ResponseEntity<ErrorResponse> invalid(Exception exception, HttpServletRequest request) {
         return reply(HttpStatus.BAD_REQUEST, "Invalid payment request", request);
     }

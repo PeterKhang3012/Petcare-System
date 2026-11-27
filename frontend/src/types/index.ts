@@ -18,7 +18,7 @@ export interface Pet extends PetInput {
   version: number;
 }
 export type BookingInput = { pet_id: string; service_id: string } &
-  ({ start_at: string } | { check_in_date: string; check_out_date: string });
+  ({ start_at: string } | { check_in_date: string; check_out_date: string; check_in_time?: string; check_out_time?: string });
 export interface CareSlot {
   start_at: string;
   end_at: string;
@@ -26,6 +26,8 @@ export interface CareSlot {
   status: 'AVAILABLE' | 'FULL' | 'PET_BUSY' | 'OUTSIDE_BOOKING_WINDOW';
 }
 export interface Quote {
+  nights?: number;
+  quantity?: number;
   pet_version?: number;
   price_version_id: string;
   total_amount: number;
@@ -34,6 +36,7 @@ export interface Quote {
   end_at: string;
 }
 export interface Booking extends Quote {
+  service_snapshot?: { type?: Resource['group']; price_rule_id?: string; room_tier?: RoomTier; name?: string };
   id: string;
   pet_id: string;
   service_id: string;
@@ -51,10 +54,53 @@ export interface DemoClock {
   version: number;
   stage?: DemoCommand;
 }
-export interface StaffBookingDetails { booking: Booking; demo_clock?: DemoClock }
+export interface StaffBookingDetails { booking: Booking; demo_clock?: DemoClock; resource?: Resource | null }
 export interface History { id: string; at: string; action: string; reason?: string; from?: string; to?: string }
-export interface Resource { id: string; code: string; group: 'CARE' | 'BOARDING'; state: string }
+export type RoomTier = 'S' | 'M' | 'L' | 'XL';
+export interface Resource {
+  id: string; code: string; group: 'CARE' | 'BOARDING'; state: string;
+  species?: ('DOG' | 'CAT')[];
+  room_tier?: RoomTier;
+  max_weight_kg?: number;
+  max_weight_inclusive?: boolean;
+  dimensions_cm?: number[];
+}
+export interface ResourceAllocation {
+  id: string; booking_id?: string; type: 'BOOKING' | 'MAINTENANCE'; start_at: string; end_at: string;
+}
 export interface Maintenance { id: string; reason: string; start_at: string; end_at: string; status: string }
+interface StaffPaymentSummary {
+  payment_id: string;
+  booking_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+export interface StaffTransaction extends StaffPaymentSummary {
+  sync_status: string | null;
+  booking_outcome: string | null;
+  reconciliation_result: string | null;
+  response_code: string | null;
+  transaction_status: string | null;
+  requested_at: string | null;
+}
+
+export interface StaffRefund extends StaffPaymentSummary {
+  event_id: string;
+  reason: string;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  gateway_response_code: string | null;
+  gateway_status: string | null;
+  gateway_transaction_no: string | null;
+  gateway_check: string | null;
+}
+
+export interface StaffTransactions extends Page { transactions: StaffTransaction[] }
+export interface StaffRefunds extends Page { refunds: StaffRefund[] }
+
 export interface Payment {
   payment_id: string;
   booking_id: string;

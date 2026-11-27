@@ -55,6 +55,26 @@ test('boarding uses facility calendar nights and protects safe integer arithmeti
   assert.throws(() => validQuote({ ...fixture[0], unit_price: 1.2 }, 'bath'), { status: 503 });
   assert.throws(() => validQuote({ ...fixture[0], currency: 'USD' }, 'bath'), { status: 503 });
 });
+test('Stay charges by the 14:00 boundary with 60 minutes reserved for cleaning', () => {
+  const service = { ...fixture[1], unit: 'DAY', unit_price: 110000 };
+  const input = { pet_id: 'a'.repeat(24), service_id: 'stay-dog-m',
+    check_in_date: '2030-01-02', check_out_date: '2030-01-03' };
+  for (const [check_in_time, check_out_time, quantity] of [
+    ['08:00', '13:59', 1.5], ['13:59', '14:00', 2], ['14:00', '13:59', 1], ['14:00', '18:00', 1.5],
+  ]) {
+    const quote = calculate(bookingInput({ ...input, check_in_time, check_out_time }), service, config, now);
+    assert.equal(quote.quantity, quantity);
+    assert.equal(quote.total_amount, quantity * 110000);
+    assert.equal(quote.nights, 1);
+    assert.equal(+quote.allocation_end_at - +quote.end_at, 60 * 60000);
+  }
+  const timed = bookingInput({ ...input, check_in_time: '15:00', check_out_time: '10:00' });
+  assert.equal(calculate({ ...timed, check_out_date: '2030-01-16' }, service, config, now).quantity, 14);
+  assert.throws(() => calculate({ ...timed, check_out_date: '2030-01-17' }, service, config, now));
+  assert.throws(() => calculate(input, service, config, now));
+  assert.throws(() => bookingInput({ ...input, check_in_time: '07:59', check_out_time: '18:00' }));
+  assert.throws(() => bookingInput({ ...input, check_in_time: '08:00', check_out_time: '18:01' }));
+});
 test('internal callers come from credentials and cannot borrow another caller capability', () => {
   const authorize = internalAuth({ payment: 'p'.repeat(40), care: 'c'.repeat(40) }, ['payment']);
   let error;

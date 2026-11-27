@@ -39,14 +39,15 @@ class BookingService {
     await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { active: false } }, { session });
     return true;
   }
-  async withBooking(bookingId, ownerId, operation) {
+  async withBooking(bookingId, ownerId, operation, additionalResources = []) {
     const filter = { _id: bookingId, ...(ownerId ? { owner_id: ownerId } : {}) };
     const before = await this.models.Booking.findOne(filter).lean();
     if (!before) fail(404, 'NOT_FOUND', 'Booking not found');
     return transaction(this.connection, async session => {
-      await lock(this.models, session, before.pet_id, [before.resource_id]);
+      await lock(this.models, session, before.pet_id, []);
       const booking = await this.models.Booking.findOne(filter).session(session).lean();
       if (!booking) fail(404, 'NOT_FOUND', 'Booking not found');
+      await lock(this.models, session, null, [booking.resource_id, ...additionalResources]);
       return operation(booking, session);
     });
   }
@@ -113,8 +114,10 @@ class BookingService {
   async bookingContext(input, ownerId, correlationId) {
     const pet = await this.clients.pet(input.pet_id, ownerId, correlationId);
     const catalog = validQuote(await this.clients.catalog(input.service_id, pet, correlationId), input.service_id);
-    if (!catalog.allowed_species.includes(pet.species) || pet.weight_kg < catalog.min_weight_kg || pet.weight_kg > catalog.max_weight_kg) invalid('The service does not support this pet');
-    const resources = await this.models.Resource.find({ group: catalog.type, species: pet.species, max_weight_kg: { $gte: pet.weight_kg } }).sort({ _id: 1 }).lean();
+    if (!catalog.allowed_species.includes(pet.species) || pet.weight_kg < catalog.min_weight_kg || (catalog.max_weight_inclusive === false ? pet.weight_kg >= catalog.max_weight_kg : pet.weight_kg > catalog.max_weight_kg)) invalid('The service does not support this pet');
+    const resources = await this.models.Resource.find({ group: catalog.type, species: pet.species, max_weight_kg: { $gte: pet.weight_kg },
+      ...(catalog.room_tier ? { room_tier: catalog.room_tier,
+        $or: [{ max_weight_kg: { $gt: pet.weight_kg } }, { max_weight_inclusive: true }] } : {}) }).sort({ _id: 1 }).lean();
     return { pet, catalog, resources };
   }
   async prepare(input, ownerId, correlationId) {
@@ -210,15 +213,15 @@ class BookingService {
       let result;
       if (booking.status === 'EXPIRED') result = { status: 409, code: 'BOOKING_EXPIRED', message: 'The hold expired; create a new booking' };
       else if (booking.status === 'CANCELLED') result = { status: 200, data: { booking: present(booking) } };
-      else if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status) || (booking.status === 'CONFIRMED' && +booking.start_at - +now < DAY)) result = { status: 409, code: 'INVALID_BOOKING_STATE', message: 'Cancellation requires an unpaid hold or a confirmed booking at least 24 hours before start' };
+      else if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status)) result = { status: 409, code: 'INVALID_BOOKING_STATE', message: 'Only unpaid or confirmed bookings can be cancelled before check-in' };
       else {
-        const paid = booking.status === 'CONFIRMED';
+        const refundable = booking.status === 'CONFIRMED' && +booking.start_at - +now >= DAY;
         await this.move(booking, 'CANCELLED', { actor_id: ownerId, actor_type: 'USER' }, reason, session);
         await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { active: false } }, { session });
-        if (paid) await this.models.Outbox.create([{ event_id: randomUUID(), type: 'REFUND_REQUESTED',
+        if (refundable) await this.models.Outbox.create([{ event_id: randomUUID(), type: 'REFUND_REQUESTED',
           payload: { booking_id: String(booking._id), payment_id: booking.accepted_payment_id, amount: booking.total_amount, currency: booking.currency, reason },
           status: 'PENDING', next_attempt_at: now, lease_until: null }], { session });
-        result = { status: 200, data: { booking: present(booking), refund_request: paid ? 'PENDING_DELIVERY' : null } };
+        result = { status: 200, data: { booking: present(booking), refund_request: refundable ? 'PENDING_DELIVERY' : null } };
       }
       await this.remember(scope, key, hash, result, session); return result;
     });

@@ -308,6 +308,47 @@
         }
       }
     },
+    "/api/auth/staff/bookings/{id}/contact": {
+      "get": {
+        "summary": "STAFF reads the customer contact for a booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer full_name and phone scoped to the booking"
+          },
+          "400": {
+            "description": "Invalid booking ID"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "STAFF role required"
+          },
+          "404": {
+            "description": "Booking not found"
+          },
+          "503": {
+            "description": "Booking service unavailable"
+          }
+        }
+      }
+    },
     "/api/auth/me": {
       "get": {
         "summary": "Read the authenticated profile",

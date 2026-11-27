@@ -110,6 +110,14 @@ public class PaymentAttempt {
         return paymentUrl;
     }
 
+    public String getVnpTxnRef() {
+        return vnpTxnRef;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     public Instant getVerifiedAt() {
         return verifiedAt;
     }

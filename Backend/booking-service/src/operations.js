@@ -1,9 +1,53 @@
-const { fail, object, text, timestamp, id, invalid } = require('./platform');
+const { fail, object, text, timestamp, id, invalid, fingerprint } = require('./platform');
 const { transaction, lock } = require('./transactions');
 const { overlap, liveAllocation, DAY, MINUTE } = require('./time');
 const { present } = require('./models');
+const roomTiers = ['S', 'M', 'L', 'XL'];
+function roomMatches(booking, room) {
+  const tier = roomTiers.indexOf(booking.service_snapshot?.room_tier);
+  const pet = booking.pet_snapshot;
+  return tier >= 0 && room.group === 'BOARDING' && room.state !== 'OUT_OF_SERVICE'
+    && roomTiers.indexOf(room.room_tier) >= tier && room.species.includes(pet.species)
+    && (pet.weight_kg < room.max_weight_kg || room.max_weight_inclusive && pet.weight_kg === room.max_weight_kg);
+}
 class ResourceOperations {
   constructor(service) { this.service = service; Object.assign(this, { models: service.models, connection: service.connection, clock: service.clock }); }
+  async transferOptions(bookingId) {
+    const booking = await this.service.get(bookingId);
+    if (booking.status !== 'CONFIRMED' || !booking.service_snapshot?.room_tier) return [];
+    const rooms = await this.models.Resource.find({ group: 'BOARDING', species: booking.pet_snapshot.species,
+      _id: { $ne: booking.resource_id } }).sort({ code: 1 }).lean();
+    const taken = await this.models.Allocation.distinct('resource_id', {
+      ...liveAllocation(this.clock()), ...overlap(booking.allocation_start_at, booking.allocation_end_at),
+    });
+    const busy = new Set(taken.map(String));
+    return rooms.filter(room => roomMatches(booking, room) && !room.occupied_booking_id && !busy.has(String(room._id))).map(present);
+  }
+  async transfer(bookingId, actorId, key, body) {
+    object(body, ['resource_id', 'reason']);
+    const target = id(body.resource_id, 'resource_id'), reason = text(body.reason, 'reason', 500);
+    const scope = `TRANSFER_STAY:${actorId}`, hash = fingerprint({ bookingId, target, reason });
+    return this.service.withBooking(bookingId, null, async (booking, session) => {
+      const previous = await this.service.replay(scope, key, hash, session);
+      if (previous) return previous;
+      if (booking.status !== 'CONFIRMED' || !booking.service_snapshot?.room_tier || String(booking.resource_id) === target)
+        fail(409, 'INVALID_BOOKING_STATE', 'Only confirmed room bookings awaiting check-in can be moved');
+      const room = await this.models.Resource.findById(target).session(session).lean(), now = this.clock();
+      const currentRoom = await this.models.Resource.findById(booking.resource_id).session(session).lean();
+      if (!roomMatches(booking, room) || room.occupied_booking_id || await this.models.Allocation.exists({
+        resource_id: target, ...liveAllocation(now), ...overlap(booking.allocation_start_at, booking.allocation_end_at),
+      }).session(session)) fail(409, 'SLOT_UNAVAILABLE', 'Replacement room is unavailable');
+      const updated = await this.models.Allocation.updateOne({ booking_id: booking._id, active: true,
+        resource_id: booking.resource_id }, { $set: { resource_id: target } }, { session });
+      if (!updated.matchedCount) fail(409, 'INVALID_BOOKING_STATE', 'The booking has no active allocation');
+      await this.models.Booking.updateOne({ _id: booking._id }, { $set: { resource_id: target } }, { session });
+      await this.service.history({ booking_id: booking._id, resource_id: room._id, action: 'ROOM_TRANSFERRED',
+        from: currentRoom.code, to: room.code, actor_type: 'STAFF', actor_id: actorId, reason }, session);
+      const result = { resource_id: target };
+      await this.service.remember(scope, key, hash, result, session);
+      return result;
+    }, [target]);
+  }
   async clean(resourceId, actorId, body) {
     object(body, ['reason']); const reason = text(body.reason, 'reason', 500);
     return transaction(this.connection, async session => {
