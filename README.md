@@ -20,20 +20,21 @@ Từ thư mục gốc dự án, tạo cấu hình mẫu nếu chưa có các fil
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-if (-not (Test-Path Backend/payment-service/.env)) {
-    Copy-Item Backend/payment-service/.env.example Backend/payment-service/.env
-}
 ```
 
 - Trong **`.env` gốc**, đặt `JWT_ISSUER` dùng chung cho Auth và các service, điền bốn token nội bộ khác nhau và hai mật khẩu MySQL của Compose. Có thể chạy `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` để tạo một giá trị ngẫu nhiên. Chạy lại cho mỗi token hoặc mật khẩu cần điền.
 - Compose tự cấp URL database và URL nội bộ `http://auth-service:3001`. Auth dùng MongoDB và volume riêng. Khi chạy lần đầu, tài khoản trong MongoDB Auth trên Windows cần được tạo lại hoặc di chuyển riêng. MongoDB replica set, seed tài nguyên Booking và migration MySQL của Payment chạy khi stack khởi động. Catalog được seed idempotent khi khởi động; Booking lấy báo giá qua HTTP từ Catalog.
-- Trong **`Backend/payment-service/.env`**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Compose mặc định dùng `http://localhost:8080/api/payments/vnpay/return` và đưa khách về `http://localhost:5173/payments/return`. Nếu dùng frontend tại origin khác, đặt `PAYMENT_FRONTEND_RETURN_URL` trong **`.env` gốc** theo đúng origin đăng nhập. Khi triển khai qua HTTPS, đặt `VNPAY_RETURN_URL` trong **`.env` gốc** và đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
+- Trong **`.env` gốc**, điền mã merchant và khóa ký VNPAY Sandbox nếu cần tạo URL thanh toán. Compose mặc định dùng `http://localhost:8080/api/payments/vnpay/return` và đưa khách về `http://localhost:5173/payments/return`. Nếu dùng frontend tại origin khác, đặt `PAYMENT_FRONTEND_RETURN_URL` trong **`.env` gốc** theo đúng origin đăng nhập. Khi triển khai qua HTTPS, đặt `VNPAY_RETURN_URL` trong **`.env` gốc** và đăng ký endpoint `/api/payments/vnpay/ipn` qua địa chỉ HTTPS công khai mà VNPAY truy cập được.
 
 ```powershell
 docker compose config --quiet
 docker compose up -d --build --wait
 docker compose ps
 ```
+
+### Chạy từng service trực tiếp
+
+Dùng cùng `.env` ở root. Các biến `LOCAL_<SERVICE>_*` dành cho chế độ chạy trực tiếp. Chạy `node scripts/run-local.cjs booking` từ root sau khi đã cài dependencies của Booking. Tương tự với `auth`, `pet`, `catalog`, `care` và `payment`. Tác vụ `seed`, `keys`, `worker` hoặc `verify` phụ thuộc vào từng service. Với frontend, chạy `npm run dev --prefix frontend`. Vite đọc `PAWSTAY_GATEWAY_TARGET` ở root.
 
 ## 4. Kiểm tra và test bằng Postman
 
@@ -71,7 +72,6 @@ docker compose down
 
 Hướng dẫn API, đổi giá, tiếp nhận/nhật ký/bàn giao và kiểm thử: [Catalog và Care](docs/catalog-care.md).
 
-<<<<<<< HEAD
 ## 5. Đồng hồ demo cho từng booking
 
 Mặc định `PAWSTAY_DEMO_ENABLED=false`. Để trình diễn bằng dữ liệu thử, đặt `PAWSTAY_DEMO_ENABLED=true` và `NODE_ENV=development` trong `.env` gốc. Khi stack đã chạy, áp dụng cấu hình cho Booking/Care:
@@ -90,8 +90,7 @@ Khi chạy service trực tiếp, đặt cùng cờ trong môi trường của c
 Đồng hồ lưu trên booking và tiếp tục chạy sau khi tải lại trang hoặc khởi động lại service. Frontend cập nhật mỗi giây từ mẫu thời gian backend, không gọi API mỗi giây. Giờ đặt gốc, giá, thanh toán và hold 15 phút của các booking khác không đổi. Demo vẫn có thể bị từ chối khi tài nguyên chưa sẵn sàng, đang bảo trì hoặc có xung đột.
 
 Để tắt, đặt cờ về `false` rồi chạy lại lệnh trên. Lượt đã đánh dấu demo giữ timeline/lịch sử và chặn nghiệp vụ mô phỏng mới cho đến khi bật lại; không chuyển ngầm về giờ thật. Nếu yêu cầu Care chưa rõ kết quả, gửi lại đúng phiếu đang chờ. Khi đã nhận từ chối cuối cùng, xử lý nguyên nhân rồi lập yêu cầu mới; không xóa receipt cũ.
-=======
-## 5. Monitoring
+## 6. Monitoring
 
 Một Prometheus thu thập metrics của sáu service mỗi 15 giây qua mạng Docker. Grafana dùng datasource Prometheus mặc định và tự nạp dashboard **PawStay Service Overview**. Hai service có volume riêng và chạy trong profile tùy chọn `monitoring`.
 
@@ -109,7 +108,7 @@ docker compose --profile monitoring up -d --build --wait
 
 Prometheus và Grafana mặc định chỉ mở trên loopback. Có thể đổi cổng máy chủ qua `PROMETHEUS_HOST_PORT` và `GRAFANA_HOST_PORT`. Gateway giữ metrics và route nội bộ trong mạng Docker.
 
-## 6. Swagger UI
+## 7. Swagger UI
 
 Khởi động stack rồi chạy `npm ci` và `npm run dev` trong `frontend/`. Mở [Swagger UI](http://localhost:5173/docs) và chọn service ở đầu trang. Bấm **Authorize** để nhập JWT lấy được từ Auth khi thử API yêu cầu đăng nhập. Dùng môi trường thử nghiệm cho các thao tác ghi. API nội bộ và các endpoint kiểm tra sức khỏe riêng của service dùng mạng Docker.
 
@@ -125,4 +124,3 @@ Trong Swagger, **Public · Không cần JWT** và **Public · Cần Bearer JWT**
 | Catalog | 3004 | [Catalog specification](http://localhost:5173/docs-api/catalog) | `/api-docs.json` |
 | Care | 3006 | [Care specification](http://localhost:5173/docs-api/care) | `/api-docs.json` |
 | Payment | 8084 | [Payment specification](http://localhost:5173/docs-api/payment) | `/v3/api-docs` |
->>>>>>> 3f8953c382b06d9bc3ec05046e3812c3038e73e8

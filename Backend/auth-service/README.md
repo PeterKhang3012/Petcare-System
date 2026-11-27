@@ -10,7 +10,6 @@ Backend/auth-service/
 ├── script.js                    # Sinh cặp khóa RSA theo đường dẫn trong .env
 ├── package.json                 # Dependencies và lệnh start/test/seed
 ├── package-lock.json            # Khóa phiên bản dependencies
-├── .env.example                 # Cấu hình mẫu, gồm STAFF_PERMISSIONS
 ├── .gitignore                   # Bỏ qua .env, keys, node_modules
 ├── README.md
 ├── scripts/
@@ -167,18 +166,17 @@ Auth cung cấp danh tính và cơ chế kiểm tra role/permission. Pet, Bookin
 
 ## Chạy dịch vụ
 
-Chạy từ thư mục `Backend/auth-service`, Node.js 24 trở lên:
+Chạy từ root của repo, Node.js 24 trở lên:
 
 ```powershell
-npm ci
-Copy-Item .env.example .env
-npm run generate:keys
-npm start
+npm ci --prefix Backend/auth-service
+node scripts/run-local.cjs auth keys
+node scripts/run-local.cjs auth
 ```
 
-Cấu hình `MONGODB_URI`, `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_ISSUER`, `JWT_EXPIRES_IN` (mặc định 1h) và `PORT` (mặc định 3001) trong `.env`. Đường dẫn key tương đối tính từ thư mục chạy lệnh. Private key chỉ đặt trong Auth; không commit `.env`/keys.
+Cấu hình `MONGODB_URI`, `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_ISSUER`, `JWT_EXPIRES_IN` (mặc định 1h) và `PORT` (mặc định 3001) qua phần `LOCAL_AUTH_*` và biến dùng chung trong `.env` gốc. Đường dẫn key tương đối tính từ thư mục Auth. Private key chỉ đặt trong Auth; không commit `.env`/keys.
 
-Chạy `node script.js` hoặc `npm run generate:keys` để sinh RSA 2048-bit, private key PKCS#8 và public key SPKI dạng PEM, tương thích JWT RS256. Script đọc hai đường dẫn JWT trong `.env`, tự tạo thư mục cha và từ chối ghi đè nếu một trong hai khóa đã tồn tại. Đường dẫn tương đối của script được tính từ thư mục auth-service.
+Chạy `node scripts/run-local.cjs auth keys` để sinh RSA 2048-bit, private key PKCS#8 và public key SPKI dạng PEM, tương thích JWT RS256. Script đọc hai đường dẫn JWT trong `.env`, tự tạo thư mục cha và từ chối ghi đè nếu một trong hai khóa đã tồn tại. Đường dẫn tương đối của script được tính từ thư mục auth-service.
 
 Startup kiểm tra cặp key và cấu hình JWT, kết nối MongoDB, tạo unique index username trước khi lắng nghe. Nếu dữ liệu cũ có username trùng, cần xử lý trước; không tự xóa dữ liệu hoặc seed khi khởi động.
 
@@ -251,15 +249,4 @@ Chưa kiểm thử với MongoDB đang chạy, unique index thực tế hoặc t
 
 ## Chạy bằng Docker
 
-Từ thư mục Auth Service, build image và dùng cặp khóa đã tạo trên máy:
-
-```powershell
-docker build -t pawstay-auth:local .
-$authKeys = (Resolve-Path ./keys).Path
-docker run --rm --name pawstay-auth --env-file .env `
-  --mount "type=bind,source=$authKeys,target=/app/keys,readonly" `
-  -e JWT_PRIVATE_KEY_PATH=/app/keys/private.pem -e JWT_PUBLIC_KEY_PATH=/app/keys/public.pem `
-  -e PORT=3001 -p 127.0.0.1:3001:3001 pawstay-auth:local
-```
-
-Khi MongoDB chạy trên Windows, dùng `host.docker.internal` trong `MONGODB_URI` của container và giữ database cùng thông tin đăng nhập hiện có. Nếu MongoDB chạy trong Docker, thêm `--network <network>` và dùng tên service MongoDB trong URI. Dừng Auth chạy trực tiếp trước khi chạy container trên cùng cổng `3001`. Tạo khóa và seed nhân viên bằng các lệnh ở trên từ máy host.
+Từ root, dùng `docker compose up -d --build --wait auth-service`. Compose cấp riêng biến của Auth, kết nối MongoDB và mount cặp khóa.

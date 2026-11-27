@@ -5,7 +5,6 @@ Cài Docker Desktop ở chế độ Linux containers và Node.js 22.19 trở lê
 ```powershell
 Set-Location frontend
 npm ci
-Copy-Item .env.example .env
 ```
 
-Chỉ sao chép `.env.example` khi chưa có `.env`. Kiểm thử trình duyệt dùng Playwright. Chạy `npx playwright install chromium` hoặc đặt `PAWSTAY_BROWSER_CHANNEL=chrome` nếu Chrome đã được cài.
+Tạo `.env` từ `.env.example` tại root repo nếu cần cấu hình gateway. Kiểm thử trình duyệt dùng Playwright. Chạy `npx playwright install chromium` hoặc đặt `PAWSTAY_BROWSER_CHANNEL=chrome` nếu Chrome đã được cài.

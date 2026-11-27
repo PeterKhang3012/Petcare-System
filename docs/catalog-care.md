@@ -9,11 +9,9 @@ Từ root của repo nhánh develop:
 ```powershell
 npm ci --prefix Backend/catalog-service
 npm ci --prefix Backend/care-service
-if (!(Test-Path Backend/catalog-service/.env)) { Copy-Item Backend/catalog-service/.env.example Backend/catalog-service/.env }
-if (!(Test-Path Backend/care-service/.env)) { Copy-Item Backend/care-service/.env.example Backend/care-service/.env }
 ```
 
-Điền cấu hình trước khi chạy:
+Điền phần `LOCAL_CATALOG_*`, `LOCAL_CARE_*` và các biến dùng chung trong `.env` gốc trước khi chạy:
 
 | Biến | Catalog | Care |
 |---|---|---|
@@ -27,10 +25,10 @@ if (!(Test-Path Backend/care-service/.env)) { Copy-Item Backend/care-service/.en
 | WORKER_ENABLED / WORKER_INTERVAL_MS | Không dùng | true / 5000, có thể chạy nhiều instance |
 
 ```powershell
-npm run seed --prefix Backend/catalog-service
-npm start --prefix Backend/catalog-service
+node scripts/run-local.cjs catalog seed
+node scripts/run-local.cjs catalog
 # Terminal khác:
-npm start --prefix Backend/care-service
+node scripts/run-local.cjs care
 ```
 
 Hoặc điền BOOKING_TO_CATALOG_TOKEN vào `.env` gốc rồi dùng Compose hiện có: `docker compose up -d --build --wait`. Catalog tự seed idempotent trước khi khởi động; Care chạy worker cùng server. Thêm CATALOG_HOST_PORT/CARE_HOST_PORT nếu cần đổi cổng host. Chỉ ba biến Catalog của Booking được đổi sang HTTP; build/command/port/volume của các service cũ được giữ nguyên. Xem [README gốc](../README.md) để chuẩn bị public key và cấu hình stack.

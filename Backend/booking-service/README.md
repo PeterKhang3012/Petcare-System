@@ -7,13 +7,12 @@ Backend Node.js/Express/CommonJS/Mongoose, sở hữu duy nhất `booking_db`. Q
 Cần Node.js >=22.19, **MongoDB replica set writable**, Pet và Auth. Dùng tài khoản `readWrite` chỉ trên `booking_db`. Startup và `/ready` từ chối standalone, không bỏ transaction để chạy tiếp. [Compose demo riêng](../../infra/pet-booking/README.md) không tác động MongoDB/Auth hiện tại.
 
 ```powershell
-npm ci
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-# Cấu hình .env theo môi trường trước khi chạy.
-npm run seed
-npm start
+npm ci --prefix Backend/booking-service
+# Từ root, cấu hình LOCAL_BOOKING_* trong .env dựa trên .env.example.
+node scripts/run-local.cjs booking seed
+node scripts/run-local.cjs booking
 # Worker riêng, nếu cần scale; API cũng chạy worker mặc định:
-npm run worker
+node scripts/run-local.cjs booking worker
 ```
 
 Seed chỉ `$setOnInsert` theo `code` unique: CARE-01, CARE-02, STAY-DOG-01, STAY-CAT-01. Chạy lại giữ nguyên mọi trạng thái, phân bổ, giá, lịch sử và tài khoản. Không tạo STAFF hoặc quyền. Nhiều worker được phép chạy đồng thời.

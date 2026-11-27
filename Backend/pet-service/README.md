@@ -6,13 +6,12 @@ Backend Node.js/Express/CommonJS/Mongoose cho hồ sơ thú cưng, sở hữu du
 
 Yêu cầu Node.js >=22.19, MongoDB và Auth hiện có đang chạy. Pet có thể dùng standalone MongoDB; Booking bắt buộc replica set. Nên dùng MongoDB demo riêng và tài khoản `readWrite` chỉ trên `pet_db` tại [hướng dẫn hạ tầng](../../infra/pet-booking/README.md).
 
-Từ thư mục service:
+Từ root của repo:
 
 ```powershell
-npm ci
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-# Điền cấu hình của môi trường vào .env trước khi chạy.
-npm start
+npm ci --prefix Backend/pet-service
+# Cấu hình LOCAL_PET_* trong .env gốc dựa trên .env.example.
+node scripts/run-local.cjs pet
 ```
 
 Các biến bắt buộc:

@@ -5,8 +5,8 @@ Java 21, Spring Boot 4.2.0 and a dedicated MySQL database. Flyway runs schema mi
 ## Run locally
 
 1. Create an empty MySQL 8.4 database named `payment_db` and an account with migration and data privileges scoped to that database.
-2. Set `PAYMENT_DB_URL`, `PAYMENT_DB_USERNAME` and `PAYMENT_DB_PASSWORD` in the process environment. See `.env.example`. The service imports an optional .env as Java properties from the working directory. Use unquoted values and forward slashes for Windows paths. Process environment variables take precedence.
-3. Run `mvn spring-boot:run`. The default port is 8084.
+2. Set `LOCAL_PAYMENT_PAYMENT_DB_URL`, `LOCAL_PAYMENT_PAYMENT_DB_USERNAME` and `LOCAL_PAYMENT_PAYMENT_DB_PASSWORD` in the root `.env`. Start from the repository root with `node scripts/run-local.cjs payment`.
+3. The default local port is 8084.
 
 The create and read APIs require Auth configuration. Creating a payment additionally requires Booking and VNPAY payment and return URL configuration. Keep merchant secrets and service tokens in environment variables.
 
@@ -18,26 +18,11 @@ From the repository root, configure the root `.env` using `.env.example` and run
 docker compose up -d --build --wait
 ```
 
-Compose starts Payment with its own MySQL 8.4 container and runs Flyway at startup. It connects to Booking and Auth by service name on the Compose network. Keep VNPAY settings in `Backend/payment-service/.env`. The host Payment port defaults to 8084. If you change `PAYMENT_HOST_PORT`, update the local browser return URL accordingly. MySQL initialization credentials apply when the volume is first created.
-
-## Run with Docker Desktop
-
-From this directory, build the image and start the container:
-
-```powershell
-docker build -t pawstay-payment:local .
-$publicKey = (Resolve-Path ../auth-service/keys/public.pem).Path
-docker run --rm --name pawstay-payment --env-file .env `
-  --mount "type=bind,source=$publicKey,target=/app/keys/auth-public.pem,readonly" `
-  -e JWT_PUBLIC_KEY_PATH=/app/keys/auth-public.pem -e PAYMENT_PORT=8084 `
-  -p 127.0.0.1:8084:8084 pawstay-payment:local
-```
-
-For MySQL and Auth on Windows, set `PAYMENT_DB_URL=jdbc:mysql://host.docker.internal:3306/payment_db` and `AUTH_SERVICE_URL=http://host.docker.internal:3001` in the runtime environment. For Booking in Compose, add `--network <compose-network>` to the run command and set `BOOKING_SERVICE_URL=http://booking-service:3003`. Use `docker network ls` to find the Compose network. If MySQL is also in Docker, join its network and use its service name in the JDBC URL. Host MySQL must listen on an address reachable from Docker Desktop. The VNPAY browser return URL can still use `http://localhost:8084/api/payments/vnpay/return` for local testing. Use a MySQL account allowed to connect from the container and migrate `payment_db`.
+Compose starts Payment with its own MySQL 8.4 container and runs Flyway at startup. It connects to Booking and Auth by service name on the Compose network. Keep VNPAY settings in the root `.env`. The host Payment port defaults to 8084. If you change `PAYMENT_HOST_PORT`, update the local browser return URL accordingly. MySQL initialization credentials apply when the volume is first created.
 
 ## Verify
 
-Run `mvn verify`. To also run the MySQL integration tests, point the database variables at a disposable `payment_db` and set `PAYMENT_MYSQL_TEST=true`. Tests apply migrations and roll back their data.
+From the repository root, run `node scripts/run-local.cjs payment verify`. To also run the MySQL integration tests, point the database variables at a disposable `payment_db` and set `PAYMENT_MYSQL_TEST=true`. Tests apply migrations and roll back their data.
 
 `payment_attempts` stores amounts in integer VND and tracks gateway verification. `payment_outbox` persists event payloads, delivery state and lease metadata. The outbox foreign key references only the local payment attempt.
 
