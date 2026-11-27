@@ -1,0 +1,1284 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PawStay Catalog",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/internal/catalog/quotes": {
+      "post": {
+        "summary": "Calculate a quote for a pet profile",
+        "description": "Service-to-service only. The gateway does not forward this route.",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "service_id": {
+                    "type": "string"
+                  },
+                  "species": {
+                    "type": "string",
+                    "enum": [
+                      "DOG",
+                      "CAT"
+                    ]
+                  },
+                  "weight_kg": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "coat_type": {
+                    "type": "string",
+                    "enum": [
+                      "SHORT",
+                      "LONG"
+                    ]
+                  }
+                },
+                "required": [
+                  "service_id",
+                  "species",
+                  "weight_kg"
+                ]
+              },
+              "example": {
+                "service_id": "bath",
+                "species": "CAT",
+                "weight_kg": 4,
+                "coat_type": "SHORT"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "quote": {
+                          "type": "object",
+                          "properties": {
+                            "service_id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "CARE",
+                                "BOARDING"
+                              ]
+                            },
+                            "allowed_species": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "DOG",
+                                  "CAT"
+                                ]
+                              }
+                            },
+                            "min_weight_kg": {
+                              "type": "number"
+                            },
+                            "max_weight_kg": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "SERVICE",
+                                "NIGHT"
+                              ]
+                            },
+                            "duration_minutes": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "price_version_id": {
+                              "type": "string"
+                            },
+                            "unit_price": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "currency": {
+                              "type": "string",
+                              "enum": [
+                                "VND"
+                              ]
+                            },
+                            "price_rule_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "service_id",
+                            "name",
+                            "type",
+                            "allowed_species",
+                            "min_weight_kg",
+                            "max_weight_kg",
+                            "unit",
+                            "duration_minutes",
+                            "price_version_id",
+                            "unit_price",
+                            "currency"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "quote"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/services": {
+      "get": {
+        "summary": "List active services",
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CARE",
+                "BOARDING"
+              ]
+            }
+          },
+          {
+            "name": "species",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DOG",
+                "CAT"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "services": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "service_id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "CARE",
+                                  "BOARDING"
+                                ]
+                              },
+                              "allowed_species": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "DOG",
+                                    "CAT"
+                                  ]
+                                }
+                              },
+                              "min_weight_kg": {
+                                "type": "number"
+                              },
+                              "max_weight_kg": {
+                                "type": "number"
+                              },
+                              "unit": {
+                                "type": "string",
+                                "enum": [
+                                  "SERVICE",
+                                  "NIGHT"
+                                ]
+                              },
+                              "duration_minutes": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "price_version_id": {
+                                "type": "string"
+                              },
+                              "unit_price": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "currency": {
+                                "type": "string",
+                                "enum": [
+                                  "VND"
+                                ]
+                              },
+                              "price_rule_id": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              },
+                              "current_price_version_id": {
+                                "type": "string"
+                              },
+                              "price_rules": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "price_rule_id": {
+                                      "type": "string"
+                                    },
+                                    "species": {
+                                      "type": "string",
+                                      "enum": [
+                                        "DOG",
+                                        "CAT"
+                                      ]
+                                    },
+                                    "coat_type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "SHORT",
+                                        "LONG"
+                                      ]
+                                    },
+                                    "min_weight_kg": {
+                                      "type": "number"
+                                    },
+                                    "max_weight_kg": {
+                                      "type": "number"
+                                    },
+                                    "max_inclusive": {
+                                      "type": "boolean"
+                                    },
+                                    "unit_price": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "price_rule_id",
+                                    "species",
+                                    "min_weight_kg",
+                                    "max_weight_kg",
+                                    "unit_price"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "service_id",
+                              "name",
+                              "type",
+                              "allowed_species",
+                              "min_weight_kg",
+                              "max_weight_kg",
+                              "unit",
+                              "duration_minutes",
+                              "price_version_id",
+                              "unit_price",
+                              "currency",
+                              "active",
+                              "current_price_version_id"
+                            ]
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "services",
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/services/{serviceId}": {
+      "get": {
+        "summary": "Read one active service",
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "service": {
+                          "type": "object",
+                          "properties": {
+                            "service_id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "CARE",
+                                "BOARDING"
+                              ]
+                            },
+                            "allowed_species": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "DOG",
+                                  "CAT"
+                                ]
+                              }
+                            },
+                            "min_weight_kg": {
+                              "type": "number"
+                            },
+                            "max_weight_kg": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "SERVICE",
+                                "NIGHT"
+                              ]
+                            },
+                            "duration_minutes": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "price_version_id": {
+                              "type": "string"
+                            },
+                            "unit_price": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "currency": {
+                              "type": "string",
+                              "enum": [
+                                "VND"
+                              ]
+                            },
+                            "price_rule_id": {
+                              "type": "string"
+                            },
+                            "active": {
+                              "type": "boolean"
+                            },
+                            "current_price_version_id": {
+                              "type": "string"
+                            },
+                            "price_rules": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "price_rule_id": {
+                                    "type": "string"
+                                  },
+                                  "species": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DOG",
+                                      "CAT"
+                                    ]
+                                  },
+                                  "coat_type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "SHORT",
+                                      "LONG"
+                                    ]
+                                  },
+                                  "min_weight_kg": {
+                                    "type": "number"
+                                  },
+                                  "max_weight_kg": {
+                                    "type": "number"
+                                  },
+                                  "max_inclusive": {
+                                    "type": "boolean"
+                                  },
+                                  "unit_price": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "price_rule_id",
+                                  "species",
+                                  "min_weight_kg",
+                                  "max_weight_kg",
+                                  "unit_price"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "service_id",
+                            "name",
+                            "type",
+                            "allowed_species",
+                            "min_weight_kg",
+                            "max_weight_kg",
+                            "unit",
+                            "duration_minutes",
+                            "price_version_id",
+                            "unit_price",
+                            "currency",
+                            "active",
+                            "current_price_version_id"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "service"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/services/{serviceId}/price-history": {
+      "get": {
+        "summary": "List price versions (STAFF)",
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "price_version_id": {
+                                "type": "string"
+                              },
+                              "service_id": {
+                                "type": "string"
+                              },
+                              "price_rule_id": {
+                                "type": "string"
+                              },
+                              "unit_price": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "currency": {
+                                "type": "string",
+                                "enum": [
+                                  "VND"
+                                ]
+                              },
+                              "old_unit_price": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "previous_price_version_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actor_id": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "price_version_id",
+                              "service_id",
+                              "unit_price",
+                              "currency",
+                              "actor_id",
+                              "reason",
+                              "created_at"
+                            ]
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "history",
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/services/{serviceId}/price": {
+      "patch": {
+        "summary": "Create a price version",
+        "description": "Requires STAFF with UPDATE_SERVICE_PRICE. The expected version guards against concurrent edits. Send price_rule_id for grouped pricing.",
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unit_price": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "expected_price_version": {
+                    "type": "string"
+                  },
+                  "price_rule_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "unit_price",
+                  "reason",
+                  "expected_price_version"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "price": {
+                          "type": "object",
+                          "properties": {
+                            "price_version_id": {
+                              "type": "string"
+                            },
+                            "service_id": {
+                              "type": "string"
+                            },
+                            "price_rule_id": {
+                              "type": "string"
+                            },
+                            "unit_price": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "currency": {
+                              "type": "string",
+                              "enum": [
+                                "VND"
+                              ]
+                            },
+                            "old_unit_price": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "previous_price_version_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "actor_id": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "price_version_id",
+                            "service_id",
+                            "unit_price",
+                            "currency",
+                            "actor_id",
+                            "reason",
+                            "created_at"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "price"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Check service liveness",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "live": {
+                          "type": "boolean"
+                        },
+                        "service": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "live",
+                        "service"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Check database readiness",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ready": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ready"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "serviceToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      }
+    }
+  }
+}

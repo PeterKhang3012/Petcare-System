@@ -1,3 +1,4 @@
+const { observability } = require('./observability');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHash, createPublicKey, randomUUID, timingSafeEqual } = require('node:crypto');
@@ -122,6 +123,7 @@ function baseApp(service, connection, logger = console) {
     res.setHeader('X-Correlation-ID', req.correlationId); res.setHeader('Cache-Control', 'no-store');
     res.on('finish', () => logger.info(JSON.stringify({ service, request_id: req.correlationId, method: req.method, status: res.statusCode }))); next();
   });
+  observability(app, 'catalog-service');
   app.use(express.json({ limit: '32kb' }));
   app.get('/health', (_req, res) => res.json({ success: true, data: { live: true, service } }));
   app.get('/ready', async (_req, res) => {

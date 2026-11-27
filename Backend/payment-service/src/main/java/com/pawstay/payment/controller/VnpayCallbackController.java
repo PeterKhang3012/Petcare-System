@@ -2,6 +2,11 @@ package com.pawstay.payment.controller;
 
 import com.pawstay.payment.dto.response.VnpayIpnResponse;
 import com.pawstay.payment.service.VnpayIpnService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -19,6 +24,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/payments/vnpay")
+@Tag(name = "VNPAY callbacks")
 public class VnpayCallbackController {
     private static final Logger LOG = LoggerFactory.getLogger(VnpayCallbackController.class);
     private final VnpayIpnService ipn;
@@ -31,7 +37,19 @@ public class VnpayCallbackController {
     }
 
     @GetMapping("/ipn")
-    VnpayIpnResponse ipn(@RequestParam MultiValueMap<String, String> parameters) {
+    @Operation(summary = "Receive a signed VNPAY notification",
+            description = "VNPAY sends a signed query including merchant code, reference, amount, transaction number and result codes. "
+                    + "The response uses VNPAY RspCode and Message. Use VNPAY's sandbox for signed requests.",
+            parameters = {
+                @Parameter(name = "vnp_TmnCode", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_TxnRef", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_Amount", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_TransactionNo", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_ResponseCode", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_TransactionStatus", in = ParameterIn.QUERY, required = true),
+                @Parameter(name = "vnp_SecureHash", in = ParameterIn.QUERY, required = true)
+            })
+    VnpayIpnResponse ipn(@Parameter(hidden = true) @RequestParam MultiValueMap<String, String> parameters) {
         try {
             return ipn.handle(parameters);
         } catch (RuntimeException exception) {
@@ -42,7 +60,12 @@ public class VnpayCallbackController {
     }
 
     @GetMapping("/return")
-    ResponseEntity<?> browserReturn(@RequestParam MultiValueMap<String, String> parameters) {
+    @Operation(summary = "Return the customer's browser to PawStay",
+            description = "Treats the transaction reference as a lookup hint. The browser return never confirms payment.",
+            parameters = @Parameter(name = "vnp_TxnRef", in = ParameterIn.QUERY))
+    @ApiResponse(responseCode = "303", description = "Redirect to the configured frontend")
+    @ApiResponse(responseCode = "200", description = "Neutral response when the frontend return URL is unavailable")
+    ResponseEntity<?> browserReturn(@Parameter(hidden = true) @RequestParam MultiValueMap<String, String> parameters) {
         if (!frontendReturnUrl.isBlank()) {
             try {
                 URI location = URI.create(frontendReturnUrl);

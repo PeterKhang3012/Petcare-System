@@ -24,7 +24,7 @@ Frontend gọi các route dưới đây qua Nginx. Các route mặc định nh�
 | POST `/api/staff/resources/:id/cleaning-complete` | Booking, STAFF | `reason` → `data.resource` | 400, 403, 404, 409 |
 | POST `/api/staff/resources/:id/maintenance` | Booking, STAFF | `reason,start_at,end_at` → `data.maintenance` | 400, 403, 404, 409 |
 | POST `/api/staff/resources/:id/maintenance/:maintenanceId/cancel` | Booking, STAFF | `reason` → `data.maintenance` | 400, 403, 404, 409 |
-| POST `/api/payments` | Payment, USER sở hữu booking | `booking_id`, `Idempotency-Key` → DTO Payment và URL nếu còn hiệu lực | 400, 401, 403, 404, 409, 503 |
+| POST `/api/payments` | Payment, USER sở hữu booking | `booking_id`, `policy_accepted: true`, `Idempotency-Key` → DTO Payment và URL nếu còn hiệu lực | 400, 401, 403, 404, 409, 503 |
 | GET `/api/payments/:paymentId` | Payment, USER sở hữu | UUID → DTO gồm trạng thái Payment và Outbox nếu có | 400, 401, 403, 404, 503 |
 | GET `/api/payments/vnpay/return` | Payment, công khai | Trình duyệt VNPay quay lại; 303 nếu cấu hình hợp lệ, nếu không thì JSON 200 | Lỗi proxy khi Payment gián đoạn |
 | GET `/api/payments/vnpay/ipn` | Payment, chữ ký VNPay | Query `vnp_*` → `RspCode,Message` | HTTP 200 với mã nghiệp vụ khi sai chữ ký, số tiền, tham chiếu, trùng hay cần retry |

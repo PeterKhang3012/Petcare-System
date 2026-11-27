@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BookingDetails, BookingList } from '../../components/BookingList';
+import { PaymentPolicy } from '../../components/PaymentPolicy';
 import { useLoad } from '../../hooks/useLoad';
 import { bookings, payments, pets } from '../../services';
 import { bookingServices } from '../../services/catalog';
@@ -124,15 +125,16 @@ function BookingActions({ booking, reload }: { booking: Booking; reload: () => v
   const [reason, setReason] = useState('');
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const cancelKey = useRef<{ reason: string; key: string } | null>(null);
   const paymentId = booking.accepted_payment_id || (user && knownPayment(user.id, booking.id));
   async function pay() {
-    if (!user) return;
+    if (!user || !policyAccepted || busy) return;
     setError(undefined); setBusy(true);
     try {
-      const payment = await payments.create(booking.id, paymentKey(user.id, booking.id));
+      const payment = await payments.create(booking.id, paymentKey(user.id, booking.id), policyAccepted);
       rememberPayment(user.id, booking.id, payment.payment_id);
-      navigate('/payments/' + payment.payment_id, { state: { paymentUrl: payment.payment_url } });
+      navigate('/payments/' + payment.payment_id, { state: { paymentUrl: payment.payment_url, policyAccepted } });
     } catch (failure) { setError(failure); }
     finally { setBusy(false); }
   }
@@ -146,10 +148,12 @@ function BookingActions({ booking, reload }: { booking: Booking; reload: () => v
     catch (failure) { setError(failure); }
     finally { setBusy(false); }
   }
-  return <><Feedback error={error}/><div className="actions">
-    {paymentId && <Link className="button secondary" to={'/payments/' + paymentId}>Xem thanh toán</Link>}
-    {booking.status === 'PENDING_PAYMENT' && !paymentId && <button disabled={busy} onClick={pay}>Khởi tạo thanh toán</button>}
-  </div>
+  return <><Feedback error={error}/>
+    {booking.status === 'PENDING_PAYMENT' && !paymentId && <section className="panel">
+      <PaymentPolicy accepted={policyAccepted} onChange={setPolicyAccepted} disabled={busy}/>
+      <button disabled={busy || !policyAccepted} onClick={pay}>Khởi tạo thanh toán</button>
+    </section>}
+    {paymentId && <div className="actions"><Link className="button secondary" to={'/payments/' + paymentId}>Xem thanh toán</Link></div>}
   {booking.status === 'CANCELLED' && booking.accepted_payment_id && <p className="feedback">Lịch đã hủy. Hãy liên hệ cơ sở để đối soát khoản tiền đã thanh toán.</p>}
   {['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status) && <form className="panel" onSubmit={cancel}>
     <h2>Hủy lịch</h2><label>Lý do<input maxLength={500} required value={reason} onChange={event => setReason(event.target.value)}/></label>

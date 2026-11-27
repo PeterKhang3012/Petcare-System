@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 5s
+
+scrape_configs:
+  - job_name: pawstay-node
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - auth-service:3001
+          - pet-service:3002
+          - booking-service:3003
+          - catalog-service:3004
+          - care-service:3006
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+):[0-9]+'
+        target_label: service
+    honor_labels: true
+
+  - job_name: pawstay-spring
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [payment-service:8084]
+        labels:
+          service: payment-service

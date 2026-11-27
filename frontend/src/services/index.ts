@@ -48,7 +48,7 @@ export const staff = {
 };
 
 export const payments = {
-  create: async (booking_id: string, key: string) =>
-    (await api.post<Payment>('/payments', { booking_id }, idempotency(key))).data,
+  create: async (booking_id: string, key: string, policyAccepted: boolean) =>
+    (await api.post<Payment>('/payments', { booking_id, policy_accepted: policyAccepted }, idempotency(key))).data,
   get: async (id: string) => (await api.get<Payment>('/payments/' + pathId(id))).data,
 };

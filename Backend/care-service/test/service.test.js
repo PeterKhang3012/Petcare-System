@@ -77,10 +77,15 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
   const depart = (b, body = checkout()) => request(base, `/api/care/bookings/${b.id}/check-out`, staff({ method: 'POST', body }));
   const clean = async b => request(bookingBase, `/api/staff/resources/${b.resource_id}/cleaning-complete`, staff({ method: 'POST', body: { reason: 'Physical cleaning complete' } }));
   const confirmed = async () => {
-    const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T02:00:00Z`);
-    const petId = randomBytes(12).toString('hex'); petRows.set(petId, { id: petId, owner_id: people.alice.id, name: 'Original Mimi', species: 'CAT', weight_kg: 3, care_notes: 'Original care note', version: 1 });
-    const q = await request(catalogBase, '/internal/catalog/quotes', { method: 'POST', credential: 'q'.repeat(40), body: { service_id: 'bath', species: 'CAT', weight_kg: 3 } });
-    const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(), body: { pet_id: petId, service_id: 'bath', expected_price_version: q.body.data.quote.price_version_id, start_at: `2030-01-${day}T09:05:00+07:00` } });
+    const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T01:55:00Z`);
+    const petId = randomBytes(12).toString('hex');
+    petRows.set(petId, { id: petId, owner_id: people.alice.id, name: 'Original Mimi', species: 'CAT', coat_type: 'SHORT', weight_kg: 3, care_notes: 'Original care note', version: 1 });
+    const input = { pet_id: petId, service_id: 'bath', start_at: `2030-01-${day}T09:00:00+07:00` };
+    const q = await request(bookingBase, '/api/bookings/quotes', { method: 'POST', token: tokens.alice, body: input });
+    assert.equal(q.status, 200, JSON.stringify(q.body));
+    const quote = q.body.data.quote;
+    const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(),
+      body: { ...input, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version } });
     assert.equal(made.status, 201, JSON.stringify(made.body)); const b = made.body.data.booking;
     const paid = await request(bookingBase, '/internal/bookings/payment-events', { method: 'POST', credential: paymentToken, body: { event_id: randomUUID(), booking_id: b.id, payment_id: randomUUID(), amount: b.total_amount, currency: 'VND', result: 'SUCCEEDED' } });
     assert.equal(paid.body.data.booking_status, 'CONFIRMED'); return b;

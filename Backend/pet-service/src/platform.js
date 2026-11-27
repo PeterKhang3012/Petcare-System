@@ -1,3 +1,4 @@
+const { observability } = require('./observability');
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -341,6 +342,7 @@ function baseApp({
     );
     next();
   });
+  observability(app, 'pet-service');
   app.use(express.json({ limit: "16kb", strict: true }));
   app.get("/health", (_req, res) =>
     res.json({ success: true, data: { service, live: true } }),

@@ -12,6 +12,8 @@ import { CatalogDetail, CatalogPage } from './pages/catalog/CatalogPages';
 import { CarePage, CareRequestPage, CareVisit } from './pages/care/CarePages';
 import type { Role } from './types';
 
+const ApiDocs = lazy(() => import('./pages/docs/ApiDocs'));
+
 function Protected({ role }: { role?: Role }) {
   const { user, loading, error, retry } = useAuth();
   const location = useLocation();
@@ -29,6 +31,7 @@ function PublicAuth({ register }: { register?: boolean }) {
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Routes>
+    <Route path="/docs" element={<Suspense fallback={<Feedback loading />}><ApiDocs /></Suspense>}/>
     <Route path="/login" element={<PublicAuth/>}/><Route path="/register" element={<PublicAuth register/>}/>
     <Route path="/payments/return" element={<PaymentReturn/>}/>
     <Route element={<Protected/>}><Route element={<Layout/>}>
@@ -46,3 +49,4 @@ export default function App() {
     </Route></Route>
   </Routes></AuthProvider></BrowserRouter>;
 }
+import { lazy, Suspense } from 'react';

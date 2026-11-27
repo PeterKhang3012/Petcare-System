@@ -1,3 +1,4 @@
+const { observability } = require('./observability');
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID, createHash, createPublicKey, timingSafeEqual } = require('node:crypto');
@@ -155,6 +156,7 @@ function baseApp({ service, connection, ready = async () => true, logger = conso
     res.on('finish', () => logger.info(JSON.stringify({ service, request_id: req.correlationId, method: req.method, status: res.statusCode })));
     next();
   });
+  observability(app, 'booking-service');
   app.use(express.json({ limit: '16kb', strict: true }));
   app.get('/health', (_req, res) => res.json({ success: true, data: { service, live: true } }));
   app.get('/ready', async (_req, res) => {

@@ -45,7 +45,7 @@ Run `mvn verify`. To also run the MySQL integration tests, point the database va
 
 | Method and path | Request | Result |
 | --- | --- | --- |
-| POST /api/payments | Bearer JWT, Idempotency-Key, JSON with booking_id | 201 for creation or 200 for replay. Includes the signed payment_url while the hold is active. |
+| POST /api/payments | Bearer JWT, Idempotency-Key, JSON with booking_id and policy_accepted set to true | 201 for creation or 200 for replay. Includes the signed payment_url while the hold is active. |
 | GET /api/payments/{paymentId} | Bearer JWT | 200 with payment details for the owner, including `verified_at` once a final gateway result has been verified. Returns 404 when no owned payment matches. |
 
 Use the same Idempotency-Key when retrying creation for the same booking. A key already used for a different booking by the same owner returns 409. Amount is read from Booking. Set AUTH_SERVICE_URL to the running Auth service origin and VNPAY_RETURN_URL to an absolute URL for Payment. For a local setup on port 8084, the return URL is http://localhost:8084/api/payments/vnpay/return. The Return handler works with or without a frontend.

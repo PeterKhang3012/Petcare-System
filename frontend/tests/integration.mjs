@@ -90,15 +90,29 @@ async function browserFlow() {
     const bookingId = page.url().split('/').pop();
     let paymentId;
     if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
-      await page.getByRole('button', { name: 'Khởi tạo thanh toán' }).click();
+      const startPayment = page.getByRole('button', { name: 'Khởi tạo thanh toán' });
+      const policyCheckbox = page.getByRole('checkbox', { name: /^Tôi đã đọc và đồng ý/ });
+      assert.equal(await startPayment.isDisabled(), true);
+      await policyCheckbox.check();
+      await policyCheckbox.uncheck();
+      assert.equal(await startPayment.isDisabled(), true);
+      await policyCheckbox.check();
+      await startPayment.click();
       await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).waitFor();
+      await policyCheckbox.uncheck();
+      assert.equal(await page.getByRole('button', { name: 'Thanh toán qua VNPAY' }).isDisabled(), true);
+      assert.equal(await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).count(), 0);
+      await policyCheckbox.check();
       paymentId = page.url().split('/').pop();
       const url = await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).getAttribute('href');
       assert.equal(new URL(url).searchParams.get('vnp_TxnRef'), paymentId.replaceAll('-', ''));
       await page.goto(base + '/payments/return?payment_id=' + paymentId + '&vnp_ResponseCode=00');
       await page.getByRole('heading', { name: 'Chi tiết thanh toán' }).waitFor();
       await page.getByText('Đang chờ', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Lấy lại liên kết VNPay' }).click();
+      const resumePayment = page.getByRole('button', { name: 'Lấy lại liên kết VNPay' });
+      assert.equal(await resumePayment.isDisabled(), true);
+      await policyCheckbox.check();
+      await resumePayment.click();
       await page.getByRole('link', { name: 'Thanh toán qua VNPAY' }).waitFor();
       report('Trình duyệt tạo Payment, tra cứu Return và lấy lại liên kết bằng cùng khóa');
     }
@@ -191,13 +205,15 @@ if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
   assert(paymentId);
   const payment = await check('GET', '/payments/' + paymentId, 200, { token });
   const paymentPath = '/payments/' + paymentId;
-  const options = { body: { booking_id: bookingId }, token, key: suffix + '-payment' };
+  const options = { body: { booking_id: bookingId, policy_accepted: true }, token, key: suffix + '-payment' };
+  await check('POST', '/payments', 400, { ...options, body: { booking_id: bookingId } });
+  await check('POST', '/payments', 400, { ...options, body: { booking_id: bookingId, policy_accepted: false } });
   const parallel = await Promise.all([1, 2].map(() => call('POST', '/payments', options)));
   assert.deepEqual(parallel.map(result => result.status).sort(), [200, 201]);
   assert.equal(parallel[0].value.payment_id, parallel[1].value.payment_id);
   await check('GET', paymentPath, 404, { token: otherToken });
-  await check('POST', '/payments', 404, { ...options, body: { booking_id: '000000000000000000000001' }, key: suffix + '-unknown' });
-  await check('POST', '/payments', 409, { ...options, body: { booking_id: duplicate.id }, key: suffix + '-cancelled' });
+  await check('POST', '/payments', 404, { ...options, body: { booking_id: '000000000000000000000001', policy_accepted: true }, key: suffix + '-unknown' });
+  await check('POST', '/payments', 409, { ...options, body: { booking_id: duplicate.id, policy_accepted: true }, key: suffix + '-cancelled' });
   const returned = await call('GET', '/payments/vnpay/return?vnp_ResponseCode=00');
   assert([200, 303].includes(returned.status));
   assert.equal((await check('GET', paymentPath, 200, { token })).status, 'PENDING');
@@ -254,7 +270,7 @@ if (process.env.PAWSTAY_TEST_VNPAY_SECRET) {
     const quote = (await check('POST', '/bookings/quotes', 200, { body: request, token })).data.quote;
     const next = (await check('POST', '/bookings', 201, { body: { ...request, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version },
       token, key: suffix + '-boarding-' + index })).data.booking;
-    return check('POST', '/payments', 201, { body: { booking_id: next.id }, token, key: suffix + '-boarding-payment-' + index });
+    return check('POST', '/payments', 201, { body: { booking_id: next.id, policy_accepted: true }, token, key: suffix + '-boarding-payment-' + index });
   }
   const late = await newAttempt(6);
   await check('POST', '/bookings/' + late.booking_id + '/cancel', 200,
