@@ -19,6 +19,7 @@ function createApp({ config, connection, logger, clock, clients = adapters(confi
   const credential = { payment: config.tokens.PAYMENT_TO_BOOKING_TOKEN, care: config.tokens.CARE_TO_BOOKING_TOKEN };
   app.get('/internal/bookings/:id/payment-context', internalAuth(credential, ['payment']), async (req, res) => res.json({ success: true, data: { booking: await service.paymentContext(id(req.params.id)) } }));
   app.post('/internal/bookings/payment-events', internalAuth(credential, ['payment']), async (req, res) => res.json({ success: true, data: await service.payment(req.body) }));
+  app.get('/internal/bookings/:id/care-time', internalAuth(credential, ['care']), async (req, res) => res.json({ success: true, data: await service.careTime(id(req.params.id)) }));
   for (const operation of ['check-in', 'check-out']) app.post(`/internal/bookings/${operation}`, internalAuth(credential, ['care']), async (req, res) => outcome(res, await service.care(operation, req.body)));
   app.get('/internal/care/requests/:requestId', internalAuth(credential, ['care']), async (req, res) => {
     const found = await models.Processed.findOne({ scope: 'CARE', key: requestKey(req.params.requestId, 'request_id') }).lean();
@@ -86,7 +87,9 @@ function createApp({ config, connection, logger, clock, clients = adapters(confi
     for (const booking of bookings) effective.push(present(await service.get(booking._id)));
     res.json({ success: true, data: { bookings: effective, page, limit, total } });
   });
-  app.get('/api/staff/bookings/:id', async (req, res) => res.json({ success: true, data: { booking: present(await service.get(id(req.params.id))) } }));
+  app.get('/api/staff/bookings/:id', async (req, res) => res.json({ success: true, data: service.staffView(await service.get(id(req.params.id))) }));
+  app.post('/api/staff/bookings/:id/demo-clock', async (req, res) => res.json({ success: true,
+    data: await service.advanceDemo(id(req.params.id), req.user, requestKey(req.headers['idempotency-key']), req.body) }));
   app.get('/api/staff/resources', async (req, res) => {
     object(req.query, ['page', 'limit', 'group', 'state']); const filter = {};
     if (req.query.group) { if (!['CARE', 'BOARDING'].includes(req.query.group)) invalid('Invalid group'); filter.group = req.query.group; }

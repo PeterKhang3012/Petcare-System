@@ -20,7 +20,15 @@ function createModels(connection) {
     allocation_start_at: { type: Date, required: true }, allocation_end_at: { type: Date, required: true },
     resource_id: { type: Schema.Types.ObjectId, required: true }, expires_at: { type: Date, required: true },
     status: { type: String, required: true, enum: ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'EXPIRED'] },
-    accepted_payment_id: String, confirmed_at: Date, checked_in_at: Date, completed_at: Date, cancelled_at: Date, expired_at: Date
+    accepted_payment_id: String, confirmed_at: Date, checked_in_at: Date, completed_at: Date, cancelled_at: Date, expired_at: Date,
+    checked_in_recorded_at: Date, completed_recorded_at: Date,
+    demo_clock: { type: new Schema({
+      is_demo: { type: Boolean, required: true }, real_anchor_at: { type: Date, required: true },
+      business_anchor_at: { type: Date, required: true }, activated_by: { type: String, required: true },
+      activated_at: { type: Date, required: true }, version: { type: Number, required: true },
+      stage: { type: String, enum: ['TO_APPOINTMENT', 'TO_HANDOVER'], required: true },
+      updated_by: String, recorded_at: Date
+    }, { _id: false, strict: 'throw' }), default: undefined }
   }, timestamps);
   booking.index({ owner_id: 1, created_at: -1, _id: -1 });
   booking.index({ pet_id: 1, status: 1, start_at: 1, end_at: 1 });
@@ -39,7 +47,8 @@ function createModels(connection) {
   const processed = new Schema({ scope: String, key: String, fingerprint: String, result: Schema.Types.Mixed }, timestamps);
   processed.index({ scope: 1, key: 1 }, { unique: true });
   const history = new Schema({ booking_id: Schema.Types.ObjectId, resource_id: Schema.Types.ObjectId,
-    action: String, from: String, to: String, actor_id: String, actor_type: String, reason: String, at: Date }, { versionKey: false });
+    action: String, from: String, to: String, actor_id: String, actor_type: String, reason: String, at: Date,
+    business_at: Date, demo_clock_version: Number }, { versionKey: false });
   history.index({ booking_id: 1, at: 1, _id: 1 });
   history.index({ resource_id: 1, at: -1, _id: -1 });
   const maintenance = new Schema({ resource_id: { type: Schema.Types.ObjectId, required: true }, start_at: Date, end_at: Date,

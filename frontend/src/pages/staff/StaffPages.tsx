@@ -1,6 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BookingDetails, BookingList } from '../../components/BookingList';
+import { DemoClockPanel } from '../../components/DemoClockPanel';
 import { CareActionForm } from '../care/CareActionForm';
 import { staff } from '../../services';
 import { useLoad } from '../../hooks/useLoad';
@@ -88,7 +89,8 @@ export function StaffBooking() {
   return <><Link to="/staff">Vận hành</Link><Feedback {...result} retry={result.reload}>{result.data && <>
     <header className="page-heading"><h1>Chi tiết lịch đặt</h1><Status value={result.data.booking.status}/></header>
     <BookingDetails booking={result.data.booking}/>
-    {result.data.booking.status === 'CONFIRMED' && <CareActionForm key={id} bookingId={id}/>}
+    <DemoClockPanel details={result.data} onChange={result.reload}/>
+    {result.data.booking.status === 'CONFIRMED' && !(result.data.demo_clock?.is_demo && !result.data.demo_clock.enabled) && <CareActionForm key={id} bookingId={id}/>}
     {['CHECKED_IN', 'COMPLETED'].includes(result.data.booking.status) && <Link to="/care">Xem hồ sơ chăm sóc</Link>}
   </>}</Feedback></>;
 }

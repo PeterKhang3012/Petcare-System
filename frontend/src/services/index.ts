@@ -1,5 +1,5 @@
 import { api, data, idempotency, pathId } from '../api/client';
-import type { Booking, BookingInput, CareSlot, Credentials, History, Maintenance, Page, Payment, Pet, PetInput, Quote, RegistrationInput, Resource, User } from '../types';
+import type { Booking, BookingInput, CareSlot, Credentials, DemoCommand, History, Maintenance, Page, Payment, Pet, PetInput, Quote, RegistrationInput, Resource, StaffBookingDetails, User } from '../types';
 
 export const auth = {
   login: (input: Credentials) => data<{ accessToken: string }>(api.post('/auth/login', input)),
@@ -33,7 +33,9 @@ export const bookings = {
 export const staff = {
   schedule: (page: number, from?: string, to?: string) =>
     data<Page & { bookings: Booking[] }>(api.get('/staff/bookings', { params: { page, from, to } })),
-  booking: (id: string) => data<{ booking: Booking }>(api.get('/staff/bookings/' + pathId(id))),
+  booking: (id: string) => data<StaffBookingDetails>(api.get('/staff/bookings/' + pathId(id))),
+  advanceDemo: (id: string, command: DemoCommand, key: string) =>
+    data<StaffBookingDetails>(api.post('/staff/bookings/' + pathId(id) + '/demo-clock', { command }, idempotency(key))),
   resources: (page: number, group?: string, state?: string) =>
     data<Page & { resources: Resource[] }>(api.get('/staff/resources', { params: { page, group, state } })),
   history: (id: string, page: number) =>

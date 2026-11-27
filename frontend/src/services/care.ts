@@ -14,6 +14,9 @@ export interface Visit {
   handover?: Handover;
   checked_in_at?: string;
   completed_at?: string;
+  demo_clock?: { is_demo: boolean; version: number };
+  checked_in_recorded_at?: string;
+  completed_recorded_at?: string;
 }
 
 export interface CareRequest {
@@ -34,6 +37,7 @@ export interface CareLog extends LogContent {
   id: string;
   version: number;
   created_at: string;
+  occurred_at?: string;
   edits: { before: LogContent; after: LogContent; reason: string; at: string; from_version: number }[];
 }
 

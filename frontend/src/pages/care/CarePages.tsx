@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { care, type Visit } from '../../services/care';
+import { staff as staffApi } from '../../services';
+import { DemoClockPanel } from '../../components/DemoClockPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLoad } from '../../hooks/useLoad';
 import { Empty, Feedback, Pagination, Status } from '../../UI/Feedback';
@@ -35,10 +37,12 @@ function VisitOverview({ visit, staff }: { visit: Visit; staff: boolean }) {
     <dt>Lịch đặt</dt><dd><Link to={(staff ? '/staff/bookings/' : '/bookings/') + visit.booking_id}>{visit.booking_id}</Link></dd>
     <dt>Đồng bộ Booking</dt><dd><Status value={visit.sync_state}/></dd>
     {visit.intake && <><dt>Đã tiếp nhận</dt><dd>{dateTime(visit.checked_in_at)}</dd>
+      {visit.checked_in_recorded_at && <><dt>Ghi nhận tiếp nhận thực tế</dt><dd>{dateTime(visit.checked_in_recorded_at)}</dd></>}
       <dt>Tình trạng lúc tiếp nhận</dt><dd>{visit.intake.initial_condition}</dd>
       <dt>Hướng dẫn chăm sóc</dt><dd>{visit.intake.care_instructions || '—'}</dd>
       <dt>Đồ dùng gửi kèm</dt><dd>{visit.intake.belongings?.join(', ') || '—'}</dd></>}
     {visit.handover && <><dt>Đã bàn giao</dt><dd>{dateTime(visit.completed_at)}</dd>
+      {visit.completed_recorded_at && <><dt>Ghi nhận bàn giao thực tế</dt><dd>{dateTime(visit.completed_recorded_at)}</dd></>}
       <dt>Người nhận</dt><dd>{visit.handover.recipient_name}</dd>
       <dt>Đồ dùng đã trả</dt><dd>{visit.handover.returned_belongings?.join(', ') || '—'}</dd>
       <dt>Ghi chú bàn giao</dt><dd>{visit.handover.notes || '—'}</dd></>}
@@ -51,11 +55,14 @@ export function CareVisit() {
   const staff = user?.role === 'STAFF';
   const result = useLoad(useCallback(() => care.get(id), [id]));
   const visit = result.data?.visit;
-  const active = visit?.state === 'IN_CARE' && !visit.request_id;
+  const demoBookingId = staff && visit?.demo_clock?.is_demo ? visit.booking_id : undefined;
+  const booking = useLoad(useCallback(() => demoBookingId ? staffApi.booking(demoBookingId) : Promise.resolve(undefined), [demoBookingId]));
+  const active = visit?.state === 'IN_CARE' && !visit.request_id && (!visit.demo_clock?.is_demo || booking.data?.demo_clock?.enabled === true);
   return <><Link to="/care">Hồ sơ chăm sóc</Link>
     <Feedback {...result} retry={result.reload}>{visit && <>
       <header className="page-heading"><h1>{visit.snapshot.pet.name}</h1><Status value={visit.state}/></header>
       <VisitOverview visit={visit} staff={staff}/>
+      {demoBookingId && <Feedback {...booking} retry={booking.reload}>{booking.data && <DemoClockPanel details={booking.data} onChange={booking.reload}/>}</Feedback>}
       <CareLogs key={visit.id} id={visit.id} editable={staff} canAdd={staff && active}/>
       {staff && active && <CareActionForm key={visit.id} bookingId={visit.booking_id} checkout/>}
     </>}</Feedback>

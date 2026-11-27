@@ -70,3 +70,22 @@ docker compose down
 `docker compose down` giữ dữ liệu trong các volume.
 
 Hướng dẫn API, đổi giá, tiếp nhận/nhật ký/bàn giao và kiểm thử: [Catalog và Care](docs/catalog-care.md).
+
+## 5. Đồng hồ demo cho từng booking
+
+Mặc định `PAWSTAY_DEMO_ENABLED=false`. Để trình diễn bằng dữ liệu thử, đặt `PAWSTAY_DEMO_ENABLED=true` và `NODE_ENV=development` trong `.env` gốc. Khi stack đã chạy, áp dụng cấu hình cho Booking/Care:
+
+```powershell
+docker compose up -d --build --no-deps --wait booking-service care-service
+```
+
+Khi chạy service trực tiếp, đặt cùng cờ trong môi trường của cả Booking và Care. Cả hai từ chối khởi động nếu bật demo cùng `NODE_ENV=production`. Không cần đổi cấu hình frontend.
+
+1. Tạo booking trong tương lai bằng tài khoản USER và thanh toán thành công để Booking ở `CONFIRMED` với khoản thanh toán đã được chấp nhận.
+2. Đăng nhập STAFF, mở **Vận hành → Chi tiết lịch đặt**, bấm **Demo đến giờ hẹn**. Đồng hồ hiển thị giờ thật và giờ nghiệp vụ GMT+7; booking vẫn là `CONFIRMED`.
+3. Điền phiếu **Tiếp nhận thú cưng** hiện có. Trong hồ sơ Care, thêm nhật ký chăm sóc.
+4. Bấm **Đến thời điểm bàn giao** ngay tại hồ sơ Care, rồi điền phiếu **Bàn giao thú cưng** để hoàn tất. Tài nguyên vẫn chuyển sang `CLEANING` và cần xác nhận vệ sinh như trước.
+
+Đồng hồ lưu trên booking và tiếp tục chạy sau khi tải lại trang hoặc khởi động lại service. Frontend cập nhật mỗi giây từ mẫu thời gian backend, không gọi API mỗi giây. Giờ đặt gốc, giá, thanh toán và hold 15 phút của các booking khác không đổi. Demo vẫn có thể bị từ chối khi tài nguyên chưa sẵn sàng, đang bảo trì hoặc có xung đột.
+
+Để tắt, đặt cờ về `false` rồi chạy lại lệnh trên. Lượt đã đánh dấu demo giữ timeline/lịch sử và chặn nghiệp vụ mô phỏng mới cho đến khi bật lại; không chuyển ngầm về giờ thật. Nếu yêu cầu Care chưa rõ kết quả, gửi lại đúng phiếu đang chờ. Khi đã nhận từ chối cuối cùng, xử lý nguyên nhân rồi lập yêu cầu mới; không xóa receipt cũ.

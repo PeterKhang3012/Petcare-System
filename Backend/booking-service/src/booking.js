@@ -4,6 +4,7 @@ const { validQuote } = require('./adapters');
 const { transaction, lock } = require('./transactions');
 const { calculate, overlap, liveAllocation, careSlots, localDay, MINUTE, DAY } = require('./time');
 const { present } = require('./models');
+const { demoEnabled, businessTime, requireDemo, clockView } = require('./demo-clock');
 const activeBookings = now => ({
   $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }],
 });
@@ -22,12 +23,15 @@ class BookingService {
   async history(data, session) {
     await this.models.History.create([{ ...data, at: this.clock() }], { session });
   }
-  async move(booking, status, actor, reason, session) {
+  async move(booking, status, actor, reason, session, businessAt) {
     const before = booking.status, at = this.clock();
     const timeField = { CONFIRMED: 'confirmed_at', CHECKED_IN: 'checked_in_at', COMPLETED: 'completed_at', CANCELLED: 'cancelled_at', EXPIRED: 'expired_at' }[status];
-    await this.models.Booking.updateOne({ _id: booking._id, status: before }, { $set: { status, [timeField]: at, updated_at: at } }, { session, timestamps: false });
-    await this.history({ booking_id: booking._id, resource_id: booking.resource_id, action: status, from: before, to: status, ...actor, reason }, session);
-    booking.status = status; booking[timeField] = at; booking.updated_at = at;
+    const changes = { status, [timeField]: businessAt || at, updated_at: at,
+      ...(businessAt ? { [status === 'CHECKED_IN' ? 'checked_in_recorded_at' : 'completed_recorded_at']: at } : {}) };
+    await this.models.Booking.updateOne({ _id: booking._id, status: before }, { $set: changes }, { session, timestamps: false });
+    await this.history({ booking_id: booking._id, resource_id: booking.resource_id, action: status, from: before, to: status, ...actor, reason,
+      ...(businessAt ? { business_at: businessAt, demo_clock_version: booking.demo_clock.version } : {}) }, session);
+    Object.assign(booking, changes);
   }
   async expireInside(booking, session, now = this.clock()) {
     if (booking.status !== 'PENDING_PAYMENT' || +booking.expires_at > +now) return false;
@@ -57,6 +61,54 @@ class BookingService {
       booking = await this.models.Booking.findById(booking._id).lean();
     }
     return booking;
+  }
+  staffView(booking) {
+    const demoClock = clockView(booking, this.config, this.clock());
+    return { booking: present(booking), ...(demoClock ? { demo_clock: demoClock } : {}) };
+  }
+  async advanceDemo(bookingId, actor, key, body) {
+    if (actor?.role !== 'STAFF') fail(403, 'FORBIDDEN', 'STAFF required');
+    requireDemo(this.config);
+    object(body, ['command']);
+    if (!['TO_APPOINTMENT', 'TO_HANDOVER'].includes(body.command)) invalid('Invalid demo clock command');
+    const actorId = id(actor.id, 'actor_id'), scope = `DEMO:${actorId}`;
+    const hash = fingerprint({ booking_id: bookingId, command: body.command });
+    return this.withBooking(bookingId, null, async (booking, session) => {
+      // The same pet/resource guards serialize this clock with Care transitions.
+      const previous = await this.replay(scope, key, hash, session);
+      if (previous) return this.staffView(booking);
+      if (body.command === 'TO_APPOINTMENT') {
+        if (booking.status !== 'CONFIRMED' || !booking.accepted_payment_id)
+          fail(409, 'INVALID_BOOKING_STATE', 'Demo reception requires a confirmed booking with an accepted payment');
+      } else if (!booking.demo_clock?.is_demo || booking.status !== 'CHECKED_IN') {
+        fail(409, 'INVALID_BOOKING_STATE', 'Demo handover requires a demo booking that is checked in');
+      }
+      const now = this.clock(), old = booking.demo_clock;
+      if (!old || (body.command === 'TO_HANDOVER' && old.stage !== 'TO_HANDOVER')) {
+        const target = body.command === 'TO_APPOINTMENT' ? booking.start_at : booking.end_at;
+        const demoClock = { is_demo: true, real_anchor_at: now,
+          business_anchor_at: new Date(Math.max(+businessTime(booking, now), +target)),
+          activated_by: old?.activated_by || actorId, activated_at: old?.activated_at || now,
+          version: (old?.version || 0) + 1, stage: body.command, updated_by: actorId, recorded_at: now };
+        await this.models.Booking.updateOne({ _id: booking._id }, { $set: { demo_clock: demoClock, updated_at: now } }, { session, timestamps: false });
+        booking.demo_clock = demoClock; booking.updated_at = now;
+        await this.history({ booking_id: booking._id, resource_id: booking.resource_id, action: body.command,
+          actor_type: 'STAFF', actor_id: actorId, reason: 'Advanced booking demo clock',
+          business_at: demoClock.business_anchor_at, demo_clock_version: demoClock.version }, session);
+      }
+      // Repeated commands with another key also keep the existing anchors intact.
+      await this.remember(scope, key, hash, { booking_id: String(booking._id), command: body.command }, session);
+      return this.staffView(booking);
+    });
+  }
+  async careTime(bookingId) {
+    const booking = await this.get(bookingId);
+    if (booking.demo_clock?.is_demo) requireDemo(this.config);
+    const now = this.clock();
+    return { booking_id: String(booking._id), booking_status: booking.status, real_now: now,
+      business_now: businessTime(booking, now), ...(booking.demo_clock?.is_demo ? {
+        demo_clock: { is_demo: true, version: booking.demo_clock.version }
+      } : {}) };
   }
   async bookingContext(input, ownerId, correlationId) {
     const pet = await this.clients.pet(input.pet_id, ownerId, correlationId);
@@ -234,21 +286,24 @@ class BookingService {
       const replay = await this.replay(scope, payload.request_id, hash, session); if (replay) return replay;
       const now = this.clock(); await this.expireInside(booking, session, now);
       const resource = await this.models.Resource.findById(booking.resource_id).session(session).lean();
+      const serviceNow = businessTime(booking, now);
+      const businessAt = booking.demo_clock?.is_demo ? serviceNow : undefined;
       let result;
       const reject = (code, message) => ({ status: 409, code, message });
-      if (operation === 'check-in') {
+      if (booking.demo_clock?.is_demo && !demoEnabled(this.config)) result = reject('DEMO_DISABLED', 'Re-enable demo outside production to continue this demo visit');
+      else if (operation === 'check-in') {
         const maintenance = await this.models.Maintenance.exists({ resource_id: resource._id, status: 'ACTIVE', start_at: { $lte: now }, end_at: { $gt: now } }).session(session);
         const petInCare = await this.models.Booking.exists({ pet_id: booking.pet_id, status: 'CHECKED_IN', _id: { $ne: booking._id } }).session(session);
-        const actualStart = new Date(Math.min(+now, +booking.allocation_start_at));
+        const actualStart = new Date(Math.min(+serviceNow, +booking.allocation_start_at));
         const earlyConflict = await this.models.Allocation.exists({ resource_id: resource._id, booking_id: { $ne: booking._id }, ...liveAllocation(now), ...overlap(actualStart, booking.allocation_end_at) }).session(session);
-        const petEarlyConflict = await this.models.Booking.exists({ pet_id: booking.pet_id, _id: { $ne: booking._id }, ...overlap(new Date(Math.min(+now, +booking.start_at)), booking.end_at),
+        const petEarlyConflict = await this.models.Booking.exists({ pet_id: booking.pet_id, _id: { $ne: booking._id }, ...overlap(new Date(Math.min(+serviceNow, +booking.start_at)), booking.end_at),
           $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }] }).session(session);
         if (booking.status !== 'CONFIRMED') result = reject('INVALID_BOOKING_STATE', 'Check-in requires CONFIRMED');
-        else if (+now < +booking.start_at - this.config.checkInEarlyMinutes * MINUTE || +now > +booking.start_at + this.config.checkInLateMinutes * MINUTE || +now >= +booking.end_at) result = reject('INVALID_BOOKING_STATE', 'Outside the configured check-in window');
+        else if (+serviceNow < +booking.start_at - this.config.checkInEarlyMinutes * MINUTE || +serviceNow > +booking.start_at + this.config.checkInLateMinutes * MINUTE || +serviceNow >= +booking.end_at) result = reject('INVALID_BOOKING_STATE', 'Outside the configured check-in window');
         else if (resource.state !== 'READY' || resource.occupied_booking_id || maintenance || petInCare || earlyConflict || petEarlyConflict) result = reject('SLOT_UNAVAILABLE', 'The resource or pet is not ready for check-in (including preparation/cleaning allocations)');
         else {
           await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { start_at: actualStart } }, { session });
-          await this.move(booking, 'CHECKED_IN', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session);
+          await this.move(booking, 'CHECKED_IN', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session, businessAt);
           await this.models.Resource.updateOne({ _id: resource._id }, { $set: { state: 'OCCUPIED', occupied_booking_id: booking._id, updated_at: now } }, { session, timestamps: false });
           resource.state = 'OCCUPIED'; resource.occupied_booking_id = booking._id; resource.updated_at = now;
           result = { status: 200, data: { booking: present(booking), resource: present(resource) } };
@@ -256,11 +311,11 @@ class BookingService {
       } else {
         if (booking.status !== 'CHECKED_IN' || String(resource.occupied_booking_id) !== String(booking._id) || resource.state !== 'OCCUPIED') result = reject('INVALID_BOOKING_STATE', 'Check-out requires this booking to occupy the resource');
         else {
-          const bufferEnd = new Date(Math.max(+booking.end_at, +now) + booking.cleaning_minutes * MINUTE);
+          const bufferEnd = new Date(Math.max(+booking.end_at, +serviceNow) + booking.cleaning_minutes * MINUTE);
           const conflict = await this.models.Allocation.exists({ resource_id: resource._id, booking_id: { $ne: booking._id }, ...liveAllocation(now), ...overlap(booking.allocation_start_at, bufferEnd) }).session(session);
           if (conflict) result = reject('SLOT_UNAVAILABLE', 'Actual service/cleaning would overlap a future allocation; resolve the conflict before retrying with a new request_id');
           else {
-            await this.move(booking, 'COMPLETED', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session);
+            await this.move(booking, 'COMPLETED', { actor_type: 'CARE', actor_id: payload.actor_id }, payload.reason, session, businessAt);
             await this.models.Allocation.updateOne({ booking_id: booking._id }, { $set: { end_at: bufferEnd, hold_until: null } }, { session });
             await this.models.Resource.updateOne({ _id: resource._id }, { $set: { state: 'CLEANING', occupied_booking_id: null, updated_at: now } }, { session, timestamps: false });
             resource.state = 'CLEANING'; resource.occupied_booking_id = null; resource.updated_at = now;

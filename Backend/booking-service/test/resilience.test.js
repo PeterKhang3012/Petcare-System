@@ -17,6 +17,10 @@ test('configuration rejects fixture in production, duplicate credentials, wrong 
   const env = { MONGODB_URI: 'mongodb://127.0.0.1:27017/booking_db', JWT_PUBLIC_KEY_PATH: publicPath, JWT_ISSUER: 'test', AUTH_BASE_URL: 'http://127.0.0.1:3001', PET_BASE_URL: 'http://127.0.0.1:3002',
     BOOKING_TO_PET_TOKEN: 'b'.repeat(40), PAYMENT_TO_BOOKING_TOKEN: 'p'.repeat(40), CARE_TO_BOOKING_TOKEN: 'c'.repeat(40) };
   assert.equal(configFor(directory, env).catalogMode, 'http');
+  assert.equal(configFor(directory, env).demoEnabled, false);
+  assert.equal(configFor(directory, { ...env, PAWSTAY_DEMO_ENABLED: 'true' }).demoEnabled, true);
+  assert.throws(() => configFor(directory, { ...env, PAWSTAY_DEMO_ENABLED: 'yes' }), /PAWSTAY_DEMO_ENABLED/);
+  assert.throws(() => configFor(directory, { ...env, PAWSTAY_DEMO_ENABLED: 'true', NODE_ENV: 'production' }), /forbidden/);
   assert.throws(() => configFor(directory, { ...env, CATALOG_MODE: 'fixture', NODE_ENV: 'production' }), /forbidden/);
   assert.throws(() => configFor(directory, { ...env, CARE_TO_BOOKING_TOKEN: env.PAYMENT_TO_BOOKING_TOKEN }), /differ/);
   assert.throws(() => configFor(directory, { ...env, MONGODB_URI: 'mongodb://127.0.0.1:27017/auth_db' }), /booking_db/);

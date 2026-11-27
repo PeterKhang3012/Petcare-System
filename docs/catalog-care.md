@@ -1,6 +1,6 @@
 # Catalog và Care
 
-Hai backend Node.js/Express/CommonJS/Mongoose, dùng `catalog_db` và `care_db`. Transaction yêu cầu MongoDB replica set. Compose tận dụng `booking-mongodb` hiện có; không thay source Auth/Pet/Booking/Payment.
+Hai backend Node.js/Express/CommonJS/Mongoose, dùng `catalog_db` và `care_db`. Transaction yêu cầu MongoDB replica set. Compose tận dụng `booking-mongodb` hiện có.
 
 ## Chạy
 
@@ -91,6 +91,18 @@ Care state PENDING -> IN_CARE -> COMPLETED; sync state PENDING/SYNCED/REJECTED t
 Worker claim lease trong DB, backoff 1 giây–5 phút, lease `3*HTTP_TIMEOUT_MS+1000` ms và token riêng mỗi claim. Restart/nhiều instance dùng đúng payload/ID đã lưu. Worker đọc receipt rồi replay payload cũ để Booking kiểm tra fingerprint (lookup hiện không trả fingerprint), không kết luận từ trạng thái Booking đơn lẻ. Timeout/5xx/response sai giữ PENDING; từ chối chắc chắn 400/401/403/404/409/422 lưu REJECTED và dừng retry. Giải quyết nguyên nhân rồi dùng ID mới; không đảo ngược Booking. API trạng thái không lộ lease, fingerprint hay payload nội bộ.
 
 Nhật ký: `{"request_id":"log-001","activity":"FEED","notes":"Đã ăn"}`. Activity BATH/FEED/CLEAN/REST/OBSERVE/PREPARE_HANDOVER, notes 1–2000 ký tự. Tạo lại cùng ID/nội dung không sinh mục trùng. Sửa: `{"expected_version":1,"notes":"Đính chính lượng ăn","reason":"Bổ sung quan sát"}`; có thể sửa activity. CAS chống ghi đè, lưu before/after, actor, thời gian, reason. STAFF có thể đính chính có audit sau hoàn tất; chỉ ghi hoạt động mới yêu cầu lượt đang phục vụ. Không xóa vật lý, không thêm bệnh án/upload.
+
+## Đồng hồ demo Booking/Care
+
+Booking là nguồn thời gian duy nhất. `PAWSTAY_DEMO_ENABLED` mặc định `false`, cần bật ở cả Booking và Care, cấm bật trong `NODE_ENV=production`. Xem [cách bật và trình diễn](../README.md#5-đồng-hồ-demo-cho-từng-booking).
+
+STAFF gọi `POST /api/staff/bookings/:id/demo-clock` với `Idempotency-Key` và body chỉ chứa `{"command":"TO_APPOINTMENT"}` hoặc `{"command":"TO_HANDOVER"}`. Lệnh đầu yêu cầu `CONFIRMED` và `accepted_payment_id`; lệnh sau yêu cầu booking demo `CHECKED_IN`. Backend lấy mốc từ `start_at`/`end_at`, không nhận giờ tùy ý và không tự chuyển trạng thái. Lặp lệnh, kể cả khóa mới, giữ nguyên các anchor; transaction dùng lại guard Pet/resource. Cùng khóa khác nội dung trả `409 IDEMPOTENCY_CONFLICT`.
+
+API chi tiết STAFF giữ `data.booking` và thêm tùy chọn `data.demo_clock` gồm `enabled,is_demo,real_now,business_now,version,stage`. Có trường này khi demo đang bật hoặc booking đã được đánh dấu demo. `booking.demo_clock` lưu anchor thật/nghiệp vụ, người kích hoạt, thời gian ghi nhận và phiên bản bền vững. Giờ nghiệp vụ bằng anchor nghiệp vụ cộng thời gian thật đã trôi qua. Khi tắt cờ, API đọc vẫn trả timeline này với `enabled=false`; thao tác mô phỏng mới trả `409 DEMO_DISABLED`. Receipt thành công trước đó vẫn có thể phục hồi khi cờ đã tắt.
+
+Care tiếp tục dùng hai API check-in/out hiện tại. Kết quả nội bộ Booking bổ sung các mốc phục vụ cần thiết cho lượt demo; worker lưu đúng `checked_in_at`/`completed_at` từ Booking, kèm `checked_in_recorded_at`/`completed_recorded_at` là giờ thật. Khi thêm nhật ký demo, Care lấy `business_now` từ `GET /internal/bookings/:id/care-time` bằng credential `CARE_TO_BOOKING_TOKEN`, lưu `occurred_at` và `demo_clock_version`; `created_at` và lịch sử chỉnh sửa giữ thời gian audit thật. Visit chỉ lưu dấu demo/phiên bản, không tự tính một đồng hồ khác. Nhật ký cũ không có các trường này vẫn hiển thị như trước.
+
+Hold, xác nhận Payment, hủy/hoàn tiền, `liveAllocation`, lease và backoff luôn dùng giờ thật. Chỉ cửa sổ phục vụ, mốc tiếp nhận/bàn giao và `occurred_at` của lượt demo dùng giờ nghiệp vụ. Các guard trạng thái, tài nguyên, bảo trì và xung đột vẫn được kiểm tra. Không có API điều khiển demo cho USER hoặc frontend gọi endpoint nội bộ.
 
 ## Test
 

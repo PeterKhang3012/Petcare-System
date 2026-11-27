@@ -88,8 +88,12 @@ function snapshot(b) {
   };
 }
 class Care {
-  constructor({ connection, models, client, clock = () => new Date() }) {
-    Object.assign(this, { connection, models, client, clock });
+  constructor({ connection, models, client, config = {}, clock = () => new Date() }) {
+    Object.assign(this, { connection, models, client, config, clock });
+  }
+  requireDemo() {
+    if (this.config.demoEnabled !== true || this.config.nodeEnv === "production" || process.env.NODE_ENV === "production")
+      fail(409, "DEMO_DISABLED", "Re-enable demo outside production to continue this demo visit");
   }
   same(request, hash) {
     if (request.fingerprint !== hash)
@@ -113,6 +117,7 @@ class Care {
       return { requestId: replay._id, replayed: true };
     }
     const b = await this.client.context(bookingId, bearer, correlationId);
+    if (b.demo_clock?.is_demo) this.requireDemo();
     if (b.status !== (action === "CHECK_IN" ? "CONFIRMED" : "CHECKED_IN"))
       fail(
         409,
@@ -202,6 +207,7 @@ class Care {
           $set: {
             pending_request_id: parsed.request_id,
             sync_state: "PENDING",
+            ...(b.demo_clock?.is_demo ? { demo_clock: { is_demo: true, version: b.demo_clock.version } } : {}),
           },
         },
         { session },
@@ -228,6 +234,18 @@ class Care {
     };
     if (!activities.includes(data.activity)) invalid("Invalid activity");
     const hash = fingerprint({ ...data, actor_id: actorId });
+    const previous = await this.models.Log.findOne({ visit_id: visitId, request_id: data.request_id }).lean();
+    if (previous) { this.same(previous, hash); return previous; }
+    const context = await this.models.Visit.findById(visitId).lean();
+    if (!context) fail(404, "NOT_FOUND", "Visit not found");
+    let timing;
+    if (context.demo_clock?.is_demo) {
+      this.requireDemo();
+      // Booking supplies each business timestamp; Care never runs a second demo clock.
+      timing = await this.client.time(context.booking_id);
+      if (!timing.demo_clock?.is_demo || timing.booking_status !== "CHECKED_IN")
+        fail(409, "INVALID_CARE_STATE", "Booking is not serving this demo visit");
+    }
     return transaction(this.connection, async (session) => {
       const old = await this.models.Log.findOne({
         visit_id: visitId,
@@ -251,6 +269,8 @@ class Care {
           "INVALID_CARE_STATE",
           "New activity requires an active visit without a pending handover",
         );
+      if (visit.demo_clock?.is_demo && (!timing || +new Date(timing.business_now) < +visit.checked_in_at))
+        fail(503, "DEPENDENCY_UNAVAILABLE", "Booking service time must follow reception");
       const [log] = await this.models.Log.create(
         [
           {
@@ -259,6 +279,8 @@ class Care {
             actor_id: actorId,
             fingerprint: hash,
             version: 1,
+            ...(timing ? { occurred_at: new Date(timing.business_now), demo_clock_version: timing.demo_clock.version,
+              created_at: this.clock(), updated_at: this.clock() } : {}),
           },
         ],
         { session },

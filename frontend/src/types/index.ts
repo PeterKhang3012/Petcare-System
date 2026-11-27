@@ -42,6 +42,16 @@ export interface Booking extends Quote {
   accepted_payment_id?: string;
   pet_snapshot?: { name: string };
 }
+export type DemoCommand = 'TO_APPOINTMENT' | 'TO_HANDOVER';
+export interface DemoClock {
+  enabled: boolean;
+  is_demo: boolean;
+  real_now: string;
+  business_now: string;
+  version: number;
+  stage?: DemoCommand;
+}
+export interface StaffBookingDetails { booking: Booking; demo_clock?: DemoClock }
 export interface History { id: string; at: string; action: string; reason?: string; from?: string; to?: string }
 export interface Resource { id: string; code: string; group: 'CARE' | 'BOARDING'; state: string }
 export interface Maintenance { id: string; reason: string; start_at: string; end_at: string; status: string }

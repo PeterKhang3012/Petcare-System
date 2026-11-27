@@ -64,6 +64,10 @@ function loadConfig(service, root, env = process.env) {
     timeoutMs: integer(Number(env.HTTP_TIMEOUT_MS || 3000), 'HTTP_TIMEOUT_MS', 100, 10000),
     port: integer(Number(env.PORT || 3006), 'PORT', 1, 65535) });
   config.bookingBaseUrl = httpUrl(env.BOOKING_BASE_URL, 'BOOKING_BASE_URL');
+  if (env.PAWSTAY_DEMO_ENABLED && !['true', 'false'].includes(env.PAWSTAY_DEMO_ENABLED)) throw new Error('Invalid PAWSTAY_DEMO_ENABLED');
+  config.demoEnabled = env.PAWSTAY_DEMO_ENABLED === 'true';
+  config.nodeEnv = env.NODE_ENV;
+  if (config.demoEnabled && config.nodeEnv === 'production') throw new Error('Demo clock is forbidden in production');
   if (env.WORKER_ENABLED && !['true', 'false'].includes(env.WORKER_ENABLED)) throw new Error('Invalid WORKER_ENABLED');
   config.workerEnabled = env.WORKER_ENABLED !== 'false';
   config.workerIntervalMs = integer(Number(env.WORKER_INTERVAL_MS || 5000), 'WORKER_INTERVAL_MS', 100, 60000);

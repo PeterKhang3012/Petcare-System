@@ -4,7 +4,7 @@ const { bookingClient } = require('./booking-client');
 const { Care } = require('./care');
 const { SyncWorker } = require('./workers');
 function createApp({ config, connection, logger, clock, client = bookingClient(config) }) {
-  const data = models(connection), service = new Care({ connection, models: data, client, clock }), worker = new SyncWorker({ connection, models: data, client, config, clock, logger });
+  const data = models(connection), service = new Care({ connection, models: data, client, config, clock }), worker = new SyncWorker({ connection, models: data, client, config, clock, logger });
   const app = baseApp('care', connection, logger); Object.assign(app.locals, { models: data, service, worker });
   app.use('/api/care', authenticate(config));
   for (const [path, action] of [['check-in', 'CHECK_IN'], ['check-out', 'CHECK_OUT']]) app.post(`/api/care/bookings/:bookingId/${path}`, staffOnly, async (req, res) => {

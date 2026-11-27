@@ -5,6 +5,7 @@ const { validQuote, adapters } = require('../src/adapters');
 const { timestamp, internalAuth } = require('../src/platform');
 const { supportsTransactions } = require('../src/transactions');
 const { BookingService } = require('../src/booking');
+const { businessTime, clockView } = require('../src/demo-clock');
 const fixture = require('../fixtures/catalog.json');
 const config = { hours: { open: '08:00', close: '18:00', boardingIn: '14:00', boardingOut: '12:00' }, preparationMinutes: 15, cleaningMinutes: 30 };
 const now = new Date('2030-01-01T02:00:00Z');
@@ -66,4 +67,31 @@ test('standalone cannot report transaction readiness and HTTP Catalog never sile
   assert.equal(await supportsTransactions({ db: { command: async () => ({ isWritablePrimary: true }) } }), false);
   const client = adapters({ catalogMode: 'http' });
   await assert.rejects(client.catalog('bath', {}), { code: 'DEPENDENCY_UNAVAILABLE' });
+});
+
+test('demo time belongs to one booking and is derived from persisted anchors after restart', () => {
+  const booking = { demo_clock: { is_demo: true, real_anchor_at: now,
+    business_anchor_at: new Date('2030-02-01T02:00:00Z'), version: 1, stage: 'TO_APPOINTMENT' } };
+  const later = new Date(+now + 5000);
+  assert.equal(businessTime({}, later), later);
+  assert.equal(businessTime(booking, later).toISOString(), '2030-02-01T02:00:05.000Z');
+  const persisted = JSON.parse(JSON.stringify(booking));
+  assert.equal(+businessTime(persisted, later), +businessTime(booking, later));
+  assert.equal(clockView({}, { demoEnabled: false }, now), undefined);
+  const disabled = clockView(persisted, { demoEnabled: false }, later);
+  assert.equal(disabled.enabled, false);
+  assert.equal(+disabled.business_now, +businessTime(booking, later));
+  assert.equal(clockView({}, { demoEnabled: true, nodeEnv: 'production' }, now), undefined);
+});
+
+test('demo control checks STAFF and configuration before accessing booking storage', async () => {
+  const service = new BookingService({ config: { demoEnabled: false } });
+  const actor = { id: 'a'.repeat(24), role: 'STAFF' };
+  await assert.rejects(service.advanceDemo('b'.repeat(24), { ...actor, role: 'USER' }, 'k', { command: 'TO_APPOINTMENT' }), { status: 403 });
+  await assert.rejects(service.advanceDemo('b'.repeat(24), actor, 'k', { command: 'TO_APPOINTMENT' }), { code: 'DEMO_DISABLED' });
+  service.config = { demoEnabled: true, nodeEnv: 'production' };
+  await assert.rejects(service.advanceDemo('b'.repeat(24), actor, 'k', { command: 'TO_APPOINTMENT' }), { code: 'DEMO_DISABLED' });
+  service.config = { demoEnabled: true };
+  for (const body of [{ command: 'SET_TIME' }, { command: 'TO_APPOINTMENT', timestamp: now.toISOString() }])
+    await assert.rejects(service.advanceDemo('b'.repeat(24), actor, 'k', body), { code: 'VALIDATION_ERROR' });
 });

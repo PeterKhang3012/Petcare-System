@@ -1226,6 +1226,9 @@
                       "properties": {
                         "booking": {
                           "$ref": "#/components/schemas/Booking"
+                        },
+                        "demo_clock": {
+                          "$ref": "#/components/schemas/DemoClock"
                         }
                       },
                       "required": [
@@ -1276,6 +1279,105 @@
             }
           }
         ]
+      }
+    },
+    "/api/staff/bookings/{id}/demo-clock": {
+      "post": {
+        "summary": "STAFF advances a booking demo clock",
+        "description": "Requires PAWSTAY_DEMO_ENABLED=true outside production. TO_APPOINTMENT requires CONFIRMED and an accepted payment; TO_HANDOVER requires a demo CHECKED_IN booking. Only fixed milestones are accepted; booking status is unchanged. Idempotency-Key is required. Replays and concurrent commands retain existing anchors; replay returns the current STAFF snapshot. Existing pet/resource transaction guards serialize clocks and Care transitions. DEMO_DISABLED or an ineligible booking returns 409.",
+        "operationId": "post_api_staff_bookings_demo_clock",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "TO_APPOINTMENT",
+                      "TO_HANDOVER"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/StaffBookingData"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/staff/resources": {
@@ -2257,10 +2359,82 @@
         ]
       }
     },
+    "/internal/bookings/{id}/care-time": {
+      "get": {
+        "summary": "Care reads the authoritative Booking service time",
+        "description": "Only CARE_TO_BOOKING_TOKEN is allowed. Care uses business_now to timestamp demo activities. Returns DEMO_DISABLED (409) for an existing demo when disabled; persisted anchors and history remain intact. This endpoint never changes the clock. Real time still controls payment holds, lease and retry.",
+        "operationId": "get_internal_bookings_care_time",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CareTime"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/internal/bookings/check-in": {
       "post": {
         "summary": "Care requests check-in",
-        "description": "Only CARE_TO_BOOKING_TOKEN credential is allowed. Care must verify current STAFF before asserting actor_id. Successful and state-conflict results are persisted by request_id; a changed payload is 409. Check-in respects actual readiness, preparation/cleaning intervals and configured time window; checkout preserves/extends the resource buffer and rejects future conflicts atomically.",
+        "description": "Only CARE_TO_BOOKING_TOKEN credential is allowed. Care must verify current STAFF before asserting actor_id. Successful and state-conflict results are persisted by request_id; a changed payload is 409. Check-in respects actual readiness, preparation/cleaning intervals and configured time window; checkout preserves/extends the resource buffer and rejects future conflicts atomically. Only demo service windows and checked_in_at/completed_at use the booking business clock; optional *_recorded_at and History.at retain real audit time. Hold expiry always uses real time. Existing demo bookings reject new actions with DEMO_DISABLED when configuration is disabled.",
         "operationId": "post_internal_bookings_check_in",
         "responses": {
           "200": {
@@ -2354,7 +2528,7 @@
     "/internal/bookings/check-out": {
       "post": {
         "summary": "Care requests check-out",
-        "description": "Only CARE_TO_BOOKING_TOKEN credential is allowed. Care must verify current STAFF before asserting actor_id. Successful and state-conflict results are persisted by request_id; a changed payload is 409. Check-in respects actual readiness, preparation/cleaning intervals and configured time window; checkout preserves/extends the resource buffer and rejects future conflicts atomically.",
+        "description": "Only CARE_TO_BOOKING_TOKEN credential is allowed. Care must verify current STAFF before asserting actor_id. Successful and state-conflict results are persisted by request_id; a changed payload is 409. Check-in respects actual readiness, preparation/cleaning intervals and configured time window; checkout preserves/extends the resource buffer and rejects future conflicts atomically. Only demo service windows and checked_in_at/completed_at use the booking business clock; optional *_recorded_at and History.at retain real audit time. Hold expiry always uses real time. Existing demo bookings reject new actions with DEMO_DISABLED when configuration is disabled.",
         "operationId": "post_internal_bookings_check_out",
         "responses": {
           "200": {
@@ -2986,9 +3160,183 @@
         ],
         "additionalProperties": false
       },
+      "StaffBookingData": {
+        "type": "object",
+        "required": [
+          "booking"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "booking": {
+            "$ref": "#/components/schemas/Booking"
+          },
+          "demo_clock": {
+            "$ref": "#/components/schemas/DemoClock"
+          }
+        }
+      },
+      "DemoClock": {
+        "type": "object",
+        "description": "STAFF time sample, present when demo is enabled or this booking is already marked demo. Disabled demo bookings retain their business timeline and block new simulated actions.",
+        "required": [
+          "enabled",
+          "is_demo",
+          "real_now",
+          "business_now",
+          "version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "is_demo": {
+            "type": "boolean"
+          },
+          "real_now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "business_now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "TO_APPOINTMENT",
+              "TO_HANDOVER"
+            ]
+          }
+        }
+      },
+      "DemoClockMarker": {
+        "type": "object",
+        "required": [
+          "is_demo",
+          "version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "is_demo": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "DemoClockContext": {
+        "type": "object",
+        "description": "Persisted booking demo anchors. Business time equals business_anchor_at plus elapsed real time. Commands advance once per stage and never replace anchors on replay.",
+        "required": [
+          "is_demo",
+          "real_anchor_at",
+          "business_anchor_at",
+          "activated_by",
+          "activated_at",
+          "version",
+          "stage",
+          "updated_by",
+          "recorded_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "is_demo": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "real_anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "business_anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activated_by": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "activated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "TO_APPOINTMENT",
+              "TO_HANDOVER"
+            ]
+          },
+          "updated_by": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CareTime": {
+        "type": "object",
+        "required": [
+          "booking_id",
+          "booking_status",
+          "real_now",
+          "business_now"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "booking_status": {
+            "type": "string",
+            "enum": [
+              "PENDING_PAYMENT",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "COMPLETED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "real_now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "business_now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "demo_clock": {
+            "$ref": "#/components/schemas/DemoClockMarker"
+          }
+        }
+      },
       "Booking": {
         "type": "object",
         "properties": {
+          "demo_clock": { "$ref": "#/components/schemas/DemoClockContext" },
+          "checked_in_recorded_at": { "type": "string", "format": "date-time" },
+          "completed_recorded_at": { "type": "string", "format": "date-time" },
           "id": {
             "type": "string",
             "pattern": "^[a-fA-F0-9]{24}$"
@@ -3224,6 +3572,8 @@
       "History": {
         "type": "object",
         "properties": {
+          "business_at": { "type": "string", "format": "date-time" },
+          "demo_clock_version": { "type": "integer", "minimum": 1 },
           "id": {
             "type": "string",
             "pattern": "^[a-fA-F0-9]{24}$"

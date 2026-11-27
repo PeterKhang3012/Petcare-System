@@ -29,6 +29,9 @@ function configFor(root, env = process.env) {
   config.checkInEarlyMinutes = number('CHECK_IN_EARLY_MINUTES', 60, 0, 1440);
   config.checkInLateMinutes = number('CHECK_IN_LATE_MINUTES', 120, 0, 1440);
   config.workerEnabled = boolean('WORKER_ENABLED', true);
+  config.nodeEnv = env.NODE_ENV;
+  config.demoEnabled = boolean('PAWSTAY_DEMO_ENABLED', false);
+  if (config.demoEnabled && config.nodeEnv === 'production') throw new Error('Demo clock is forbidden in production');
   config.workerIntervalMs = number('WORKER_INTERVAL_MS', 5000, 100, 60000);
   return config;
 }

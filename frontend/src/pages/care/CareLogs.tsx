@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { care, activities, type Activity, type CareLog } from '../../services/care';
 import { useLoad } from '../../hooks/useLoad';
 import { Empty, Feedback, Pagination } from '../../UI/Feedback';
@@ -19,7 +20,8 @@ export function CareLogs({ id, editable, canAdd }: { id: string; editable: boole
     {canAdd && <LogForm id={id} saved={saved}/>}
     <Feedback {...result} retry={result.reload}>{result.data && <>
       {result.data.logs.length ? <ul className="timeline">{result.data.logs.map(log => <li key={log.id}>
-        <strong>{activities[log.activity]}</strong><small>{dateTime(log.created_at)} · Phiên bản {log.version}</small><p>{log.notes}</p>
+        <strong>{activities[log.activity]}</strong><small>{dateTime(log.occurred_at || log.created_at)} · Phiên bản {log.version}</small>
+        {log.occurred_at && <small>Ghi nhận thực tế: {dateTime(log.created_at)}</small>}<p>{log.notes}</p>
         {Boolean(log.edits?.length) && <details><summary>Lịch sử chỉnh sửa</summary><ul className="timeline">{log.edits.map(edit => <li key={edit.from_version}>
           <small>{dateTime(edit.at)}</small><p>{edit.reason}</p>
           <p>Trước: {activities[edit.before.activity]} · {edit.before.notes}</p>
@@ -35,8 +37,9 @@ export function CareLogs({ id, editable, canAdd }: { id: string; editable: boole
 }
 
 function LogForm({ id, log, saved, reload }: { id: string; log?: CareLog; saved: () => void; reload?: () => void }) {
-  const request = useRef<{ fingerprint: string; id: string } | undefined>(undefined);
+  const request = useRef<{ fingerprint: string; id: string; input: { activity: Activity; notes: string } } | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<unknown>();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,19 +52,29 @@ function LogForm({ id, log, saved, reload }: { id: string; log?: CareLog; saved:
         await care.editLog(id, log.id, { ...input, expected_version: log.version, reason: String(form.get('reason')).trim() });
       } else {
         const fingerprint = JSON.stringify(input);
-        if (request.current?.fingerprint !== fingerprint) request.current = { fingerprint, id: crypto.randomUUID() };
-        await care.addLog(id, { ...input, request_id: request.current.id });
+        if (!request.current || (!uncertain && request.current.fingerprint !== fingerprint)) request.current = { fingerprint, id: crypto.randomUUID(), input };
+        await care.addLog(id, { ...request.current.input, request_id: request.current.id });
         request.current = undefined;
+        setUncertain(false);
         element.reset();
       }
       saved();
-    } catch (failure) { setError(failure); }
+    } catch (failure) {
+      if (!log) {
+        const final = isAxiosError(failure) && failure.response && [400, 401, 403, 404, 409, 422].includes(failure.response.status);
+        if (final) request.current = undefined;
+        setUncertain(!final);
+      }
+      setError(failure);
+    }
     finally { setBusy(false); }
   }
   return <form onSubmit={submit} className="form-grid">
-    <label>Hoạt động<select name="activity" defaultValue={log?.activity}>{Object.entries(activities).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
-    <label>Ghi chú<textarea name="notes" defaultValue={log?.notes} maxLength={2000} required/></label>
+    <label>Hoạt động<select name="activity" defaultValue={log?.activity} disabled={busy || uncertain}>{Object.entries(activities).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
+    <label>Ghi chú<textarea name="notes" defaultValue={log?.notes} maxLength={2000} readOnly={busy || uncertain} required/></label>
     {log && <label>Lý do chỉnh sửa<input name="reason" maxLength={500} required/></label>}
-    <div className="full"><Feedback error={error} retry={reload}/><button disabled={busy}>{busy ? 'Đang lưu…' : log ? 'Lưu chỉnh sửa' : 'Thêm nhật ký'}</button></div>
+    <div className="full"><Feedback error={error} retry={reload}/>
+      {uncertain && <p className="feedback" role="status">Chưa xác định kết quả. Gửi lại nhật ký đang chờ để kiểm tra; nội dung được giữ nguyên.</p>}
+      <button disabled={busy}>{busy ? 'Đang lưu…' : uncertain ? 'Gửi lại nhật ký đang chờ' : log ? 'Lưu chỉnh sửa' : 'Thêm nhật ký'}</button></div>
   </form>;
 }

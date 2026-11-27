@@ -21,8 +21,12 @@ class SyncWorker {
       } }, { session, returnDocument: 'after' }).lean();
       if (!changed) return; // Another lease superseded this worker; its result cannot overwrite it.
       const updates = { pending_request_id: null, sync_state: succeeded ? 'SYNCED' : 'REJECTED' };
-      if (succeeded && request.action === 'CHECK_IN') Object.assign(updates, { state: 'IN_CARE', intake: request.draft, intake_actor_id: request.payload.actor_id, checked_in_at: at });
-      if (succeeded && request.action === 'CHECK_OUT') Object.assign(updates, { state: 'COMPLETED', handover: request.draft, handover_actor_id: request.payload.actor_id, completed_at: at });
+      if (succeeded && request.action === 'CHECK_IN') Object.assign(updates, { state: 'IN_CARE', intake: request.draft, intake_actor_id: request.payload.actor_id,
+        checked_in_at: result.demo_clock ? new Date(result.checked_in_at) : at,
+        ...(result.demo_clock ? { demo_clock: result.demo_clock, checked_in_recorded_at: new Date(result.checked_in_recorded_at) } : {}) });
+      if (succeeded && request.action === 'CHECK_OUT') Object.assign(updates, { state: 'COMPLETED', handover: request.draft, handover_actor_id: request.payload.actor_id,
+        completed_at: result.demo_clock ? new Date(result.completed_at) : at,
+        ...(result.demo_clock ? { demo_clock: result.demo_clock, completed_recorded_at: new Date(result.completed_recorded_at) } : {}) });
       const visit = await this.models.Visit.updateOne({ _id: request.visit_id, pending_request_id: request._id }, { $set: updates, $inc: { revision: 1 } }, { session });
       if (visit.modifiedCount !== 1) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Visit synchronization needs recovery');
     }); return true;

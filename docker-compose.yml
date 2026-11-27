@@ -99,6 +99,8 @@ services:
     environment:
       <<: *service-environment
       PORT: 3003
+      NODE_ENV: ${NODE_ENV:-development}
+      PAWSTAY_DEMO_ENABLED: ${PAWSTAY_DEMO_ENABLED:-false}
       MONGODB_URI: mongodb://booking-mongodb:27017/booking_db?replicaSet=pawstay-demo
       PET_BASE_URL: http://pet-service:3002
       CATALOG_MODE: http
@@ -188,6 +190,8 @@ services:
     build: ./Backend/care-service
     environment:
       PORT: 3006
+      NODE_ENV: ${NODE_ENV:-development}
+      PAWSTAY_DEMO_ENABLED: ${PAWSTAY_DEMO_ENABLED:-false}
       MONGODB_URI: mongodb://booking-mongodb:27017/care_db?replicaSet=pawstay-demo
       AUTH_BASE_URL: http://auth-service:3001
       JWT_ISSUER: ${JWT_ISSUER:?Set JWT_ISSUER in the root .env}
