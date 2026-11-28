@@ -53,9 +53,20 @@ function bookingClient(config) {
     }
   };
 }
+const safeRejections = new Set([
+  'Outside the configured check-in window',
+  'Check-in requires CONFIRMED',
+  'Check-in requires CONFIRMED with an accepted payment',
+  'Check-out requires this booking to occupy the resource',
+  'The resource or pet is not ready for check-in (including preparation/cleaning allocations)',
+  'Actual service/cleaning would overlap a future allocation; resolve the conflict before retrying with a new request_id',
+  'Re-enable demo outside production to continue this demo visit',
+]);
 function rejection(response) {
   if (![400, 401, 403, 404, 409, 422].includes(response.status) || response.body?.success !== false) fail(503, 'DEPENDENCY_UNAVAILABLE', 'Unexpected Booking response');
   const code = typeof response.body.code === 'string' && /^[A-Z_]{1,80}$/.test(response.body.code) ? response.body.code : 'BOOKING_REJECTED';
-  return { status: response.status, code, message: 'Booking rejected this operation; inspect its status and retry with a new request_id after resolving the cause' };
+  const message = safeRejections.has(response.body.message) ? response.body.message :
+    'Booking rejected this operation; inspect its status and retry with a new request_id after resolving the cause';
+  return { status: response.status, code, message };
 }
 module.exports = { bookingClient };

@@ -162,6 +162,99 @@ async function browserFlow() {
   } finally { await browser.close(); }
 }
 
+// Focused UI regression mode: all API calls are intercepted; no application data is written.
+async function demoClockBrowserFlow() {
+  const browser = await chromium.launch(process.env.PAWSTAY_BROWSER_CHANNEL ? { channel: process.env.PAWSTAY_BROWSER_CHANNEL } : {});
+  try {
+    const page = await browser.newPage(), errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(() => sessionStorage.setItem('pawstay.session', 'demo-ui-test'));
+    const id = 'a'.repeat(24), visitId = 'b'.repeat(24), start = new Date(Date.now() + 86400000);
+    start.setUTCHours(2, 0, 0, 0);
+    const end = new Date(+start + 3600000).toISOString(), calls = [], clocks = [], careBodies = [];
+    let enabled = true, active = false, business = new Date().toISOString(), status = 'CONFIRMED', loseCare = false, receipt;
+    const details = () => ({ booking: { id, pet_id: 'c'.repeat(24), service_id: 'bath', service_snapshot: { type: 'CARE' },
+      start_at: start.toISOString(), end_at: end, status, accepted_payment_id: 'test-payment', total_amount: 200000, currency: 'VND' },
+      resource: { id: 'd'.repeat(24), code: 'CARE-1', state: 'READY' },
+      demo_clock: { enabled, is_demo: active, real_now: new Date().toISOString(), business_now: business, version: clocks.length,
+        min_time: new Date(+start - 3600000).toISOString(), max_time: new Date(Date.parse(end) - 1).toISOString() } });
+    await page.route(url => url.pathname.startsWith('/api/'), async route => {
+      const req = route.request(), path = new URL(req.url()).pathname.slice(4), body = req.method() === 'POST' ? req.postDataJSON() : undefined;
+      const ok = data => route.fulfill({ json: { success: true, data } });
+      if (path === '/auth/me') return ok({ user: { id: 'e'.repeat(24), username: 'demo-staff', role: 'STAFF', permissions: [] } });
+      if (path.endsWith('/contact')) return ok({ contact: { full_name: 'Test owner', phone: '0900000000' } });
+      if (path === '/staff/bookings/' + id) { calls.push('context'); return ok(details()); }
+      if (path.endsWith('/demo-clock')) {
+        calls.push('clock'); clocks.push({ body, key: req.headers()['idempotency-key'] });
+        active = true; business = body.command === 'SET_TIME' ? body.time : start.toISOString();
+        return ok(details());
+      }
+      if (path.endsWith('/check-in')) {
+        calls.push('care'); careBodies.push(body);
+        if (enabled) assert(active, 'The clock must be confirmed before Care receives a request');
+        if (receipt?.request_id !== body.request_id) receipt = { request_id: body.request_id, visit_id: visitId, action: 'CHECK_IN', status: enabled ? 'SUCCEEDED' : 'REJECTED',
+          ...(!enabled ? { result: { code: 'INVALID_BOOKING_STATE', message: 'Outside the configured check-in window' } } : {}) };
+        if (loseCare) { loseCare = false; status = 'CHECKED_IN'; return route.abort('failed'); }
+        return ok({ request: receipt, visit: { id: visitId, state: 'IN_CARE' } });
+      }
+      if (path.startsWith('/care/requests/')) return ok({ request: receipt });
+      throw new Error('Unexpected demo UI request: ' + path);
+    });
+    const open = async () => { await page.goto(base + '/staff/bookings/' + id); await page.getByRole('heading', { name: 'Tiếp nhận thú cưng', exact: true }).waitFor(); };
+    const fill = async () => { await page.getByLabel('Tình trạng lúc tiếp nhận').fill('Healthy'); await page.getByLabel('Lý do', { exact: true }).first().fill('Test reception'); };
+    await open();
+    await page.getByRole('button', { name: 'Xác nhận tiếp nhận (giờ demo)', exact: true }).click();
+    assert.equal(clocks.length, 0); assert.equal(careBodies.length, 0);
+    await fill();
+    await page.getByRole('button', { name: 'Xác nhận tiếp nhận (giờ demo)', exact: true }).click();
+    await page.waitForURL('**/care/requests/**');
+    assert.deepEqual(calls.filter(value => value !== 'context'), ['clock', 'care']);
+    assert.equal(clocks[0].body.command, 'TO_APPOINTMENT');
+    assert.equal(clocks[0].key, 'reception:' + careBodies[0].request_id);
+    assert.deepEqual(Object.keys(careBodies[0]).sort(), ['belongings', 'care_instructions', 'initial_condition', 'reason', 'request_id']);
+    report('UI: validate phiếu, xác nhận đồng hồ trước Care và khóa kích hoạt gắn với request_id');
+
+    active = false; status = 'CONFIRMED'; calls.length = 0;
+    await open(); await fill();
+    const selected = new Date(+start + 5 * 60000).toISOString();
+    await page.getByLabel('Ngày/giờ mô phỏng (GMT+7)').fill(selected.slice(0, 10) + 'T09:05');
+    await page.getByRole('button', { name: 'Áp dụng giờ mô phỏng', exact: true }).click();
+    await page.getByText('Đã áp dụng giờ nghiệp vụ tại Booking. Đồng hồ tiếp tục chạy.').waitFor();
+    assert.equal(clocks.at(-1).body.command, 'SET_TIME'); assert.equal(clocks.at(-1).body.time, selected);
+    // Applying the panel must not unmount or erase a filled reception form.
+    assert.equal(await page.getByLabel('Tình trạng lúc tiếp nhận').inputValue(), 'Healthy');
+    await page.reload(); await fill();
+    const clockCount = clocks.length;
+    loseCare = true;
+    await page.getByRole('button', { name: 'Xác nhận tiếp nhận (giờ demo)', exact: true }).click();
+    await page.getByRole('button', { name: 'Gửi lại phiếu đang chờ', exact: true }).waitFor();
+    const contextCount = calls.filter(value => value === 'context').length;
+    enabled = false; // A later clock/config failure must not block recovery of Care's saved result.
+    await page.getByRole('button', { name: 'Gửi lại phiếu đang chờ', exact: true }).click();
+    await page.waitForURL('**/care/requests/**');
+    assert.equal(clocks.length, clockCount); assert.equal(business, selected);
+    assert.equal(calls.filter(value => value === 'context').length, contextCount);
+    assert.deepEqual(careBodies.at(-1), careBodies.at(-2));
+    assert.equal(receipt.status, 'SUCCEEDED');
+    report('UI: giữ mốc thủ công sau tải lại; mất phản hồi Care dùng lại phiếu, không gọi lại đồng hồ');
+
+    active = false; status = 'CONFIRMED';
+    await open();
+    await page.getByText('Demo đang tắt · chưa kích hoạt', { exact: true }).waitFor();
+    await fill(); await page.getByRole('button', { name: 'Xác nhận tiếp nhận', exact: true }).click();
+    await page.waitForURL('**/care/requests/**');
+    await page.getByText(/Ngoài cửa sổ tiếp nhận của lịch đặt/).waitFor();
+    await page.getByText(/gửi phiếu mới với mã yêu cầu mới/).waitFor();
+    assert.equal(clocks.length, clockCount); assert.deepEqual(errors, []);
+    report('UI: demo tắt giữ luồng cũ, lỗi ngoài giờ được giải thích và REJECTED yêu cầu phiếu mới');
+  } finally { await browser.close(); }
+}
+
+if (process.env.PAWSTAY_TEST_DEMO_UI === 'true') {
+  await demoClockBrowserFlow();
+  process.exit(0);
+}
+
 const { petId, bookingId, paymentId } = await browserFlow();
 await check('POST', '/auth/register', 409, { body: customer });
 await check('POST', '/auth/login', 401, { body: { ...customer, password: 'incorrect' } });

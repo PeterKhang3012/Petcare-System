@@ -225,10 +225,10 @@ export function StaffBooking() {
     </section>}
     {result.data.booking.status === 'CONFIRMED' && result.data.booking.service_snapshot?.room_tier &&
       <RoomTransfer key={id} id={id} reload={result.reload}/>}
-    <DemoClockPanel details={result.data} onChange={result.reload}/>
+    <DemoClockPanel key={id} details={result.data}/>
     <BookingContact key={id} id={id}/>
     {result.data.booking.status === 'CONFIRMED' && <>
-      {!(result.data.demo_clock?.is_demo && !result.data.demo_clock.enabled) && <CareActionForm key={id} bookingId={id}/>}
+      {!(result.data.demo_clock?.is_demo && !result.data.demo_clock.enabled) && <CareActionForm key={id} bookingId={id} demo={result.data.demo_clock}/>}
       <StaffCancellation key={id + '-cancel'} id={id} priceGroup={result.data.booking.service_snapshot?.price_rule_id} reload={result.reload}/>
     </>}
     {['CHECKED_IN', 'COMPLETED'].includes(result.data.booking.status) && <Link to="/care">Xem hồ sơ chăm sóc</Link>}

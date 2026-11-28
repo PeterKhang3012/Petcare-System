@@ -40,6 +40,30 @@ test('Care configuration defaults demo off and rejects enabling it in production
   assert.throws(() => loadConfig('care', directory, { ...env, PAWSTAY_DEMO_ENABLED: 'true', NODE_ENV: 'production' }), /forbidden/);
 });
 
+test('Booking client preserves safe rejection reasons and status/code without exposing diagnostics', async t => {
+  let status = 409, result = { success: false, code: 'INVALID_BOOKING_STATE', message: 'Outside the configured check-in window' };
+  const server = http.createServer((req, res) => {
+    req.resume(); res.setHeader('Content-Type', 'application/json');
+    res.statusCode = req.method === 'GET' ? 404 : status;
+    res.end(JSON.stringify(req.method === 'GET' ? { success: false, code: 'NOT_FOUND' } : result));
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  t.after(async () => { server.closeAllConnections(); await new Promise(r => server.close(r)); });
+  const client = bookingClient({ bookingBaseUrl: `http://127.0.0.1:${server.address().port}`, token: 'test-only-credential', timeoutMs: 1000 });
+  const payload = { request_id: 'rejection-test', booking_id: 'a'.repeat(24), actor_id: 'b'.repeat(24), reason: 'Test' };
+  for (const message of ['Outside the configured check-in window', 'Check-in requires CONFIRMED with an accepted payment']) {
+    result.message = message;
+    assert.deepEqual(await client.execute(payload, 'CHECK_IN'), { status: 409, code: 'INVALID_BOOKING_STATE', message });
+  }
+  result = { success: false, code: 'SLOT_UNAVAILABLE', message: 'The resource or pet is not ready for check-in (including preparation/cleaning allocations)' };
+  assert.deepEqual(await client.execute(payload, 'CHECK_IN'), { status, code: result.code, message: result.message });
+  for (const [httpStatus, code] of [[401, 'UNAUTHORIZED'], [403, 'FORBIDDEN'], [409, 'DEMO_DISABLED']]) {
+    status = httpStatus; result = { success: false, code, message: 'stack trace with private diagnostic: test-secret' };
+    const rejected = await client.execute(payload, 'CHECK_IN');
+    assert.equal(rejected.status, status); assert.equal(rejected.code, code); assert(!rejected.message.includes('test-secret'));
+  }
+});
+
 test('Care recovers and audits against live Booking/Catalog on a real replica set', { skip: !process.env.TEST_MONGODB_URI && 'Set TEST_MONGODB_URI to a disposable replica set (no DB mock is used)' }, async t => {
   const connections = [], servers = [], suffix = randomBytes(6).toString('hex');
   t.after(async () => { for (const s of servers.reverse()) { s.closeAllConnections(); await new Promise(r => s.close(r)); } for (const c of connections.reverse()) await c.close(); });
@@ -99,27 +123,18 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
   const arrive = (b, body = intake(), token = tokens.staff) => request(base, `/api/care/bookings/${b.id}/check-in`, { method: 'POST', token, body });
   const depart = (b, body = checkout()) => request(base, `/api/care/bookings/${b.id}/check-out`, staff({ method: 'POST', body }));
   const clean = async b => request(bookingBase, `/api/staff/resources/${b.resource_id}/cleaning-complete`, staff({ method: 'POST', body: { reason: 'Physical cleaning complete' } }));
-<<<<<<< HEAD
   const hold = async ({ future = false, serviceId = 'bath' } = {}) => {
     const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T01:55:00Z`);
-    const startDay = new Date(+now + (future ? 7 : 0) * 86400000).toISOString().slice(0, 10);
+    const startDay = new Date(+now + (future ? 1 : 0) * 86400000).toISOString().slice(0, 10);
     const petId = randomBytes(12).toString('hex'); petRows.set(petId, { id: petId, owner_id: people.alice.id, name: 'Original Mimi', species: 'CAT', coat_type: 'SHORT', weight_kg: 3, care_notes: 'Original care note', version: 1 });
-    const q = await request(catalogBase, '/internal/catalog/quotes', { method: 'POST', credential: 'q'.repeat(40), body: { service_id: serviceId, species: 'CAT', coat_type: 'SHORT', weight_kg: 3 } });
-    assert.equal(q.status, 200, JSON.stringify(q.body));
-    const schedule = serviceId === 'boarding' ? { check_in_date: startDay, check_out_date: new Date(Date.parse(startDay) + 86400000).toISOString().slice(0, 10) } : { start_at: `${startDay}T09:00:00+07:00` };
-    const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(), body: { pet_id: petId, service_id: serviceId, expected_price_version: q.body.data.quote.price_version_id, expected_pet_version: 1, ...schedule } });
-=======
-  const confirmed = async () => {
-    const day = String(++sequence).padStart(2, '0'); now = new Date(`2030-01-${day}T01:55:00Z`);
-    const petId = randomBytes(12).toString('hex');
-    petRows.set(petId, { id: petId, owner_id: people.alice.id, name: 'Original Mimi', species: 'CAT', coat_type: 'SHORT', weight_kg: 3, care_notes: 'Original care note', version: 1 });
-    const input = { pet_id: petId, service_id: 'bath', start_at: `2030-01-${day}T09:00:00+07:00` };
+    const schedule = serviceId.startsWith('stay-') ? { check_in_date: startDay,
+      check_out_date: new Date(Date.parse(startDay) + 86400000).toISOString().slice(0, 10), check_in_time: '14:00', check_out_time: '12:00' } : { start_at: `${startDay}T09:00:00+07:00` };
+    const input = { pet_id: petId, service_id: serviceId, ...schedule };
     const q = await request(bookingBase, '/api/bookings/quotes', { method: 'POST', token: tokens.alice, body: input });
     assert.equal(q.status, 200, JSON.stringify(q.body));
     const quote = q.body.data.quote;
     const made = await request(bookingBase, '/api/bookings', { method: 'POST', token: tokens.alice, key: randomUUID(),
       body: { ...input, expected_price_version: quote.price_version_id, expected_pet_version: quote.pet_version } });
->>>>>>> 3f8953c382b06d9bc3ec05046e3812c3038e73e8
     assert.equal(made.status, 201, JSON.stringify(made.body)); const b = made.body.data.booking;
     return b;
   };
@@ -228,13 +243,79 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
     assert.equal(final.attempts, 3); assert.equal(await bapp.locals.models.History.countDocuments({ booking_id: b.id, action: 'CHECKED_IN' }), 1);
     assert.equal((await depart(b)).status, 201); await clean(b);
   });
+  await t.test('tomorrow reception uses SET_TIME at Booking, preserves replays and records real audit time through handover', async () => {
+    demoEnabled(false);
+    const b = await confirmed({ future: true });
+    const before = await bapp.locals.models.Booking.findById(b.id).lean(), realAt = +now;
+    const early = intake(), refused = await arrive(b, early);
+    assert.equal(refused.status, 409); assert.equal(refused.body.code, 'INVALID_BOOKING_STATE');
+    assert.equal(refused.body.message, 'Outside the configured check-in window');
+    const rejected = await data.Request.findById(early.request_id).lean();
+    demoEnabled(true);
+    const target = new Date(Date.parse(b.start_at) + 5 * 60000), key = randomUUID();
+    const applied = await advance(b, 'SET_TIME', { key, extra: { time: target.toISOString() } });
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+    assert.equal(applied.body.data.demo_clock.business_now, target.toISOString());
+    assert.equal(applied.body.data.demo_clock.stage, 'TO_APPOINTMENT');
+    assert.equal(Date.parse(applied.body.data.demo_clock.min_time), Date.parse(b.start_at) - bookingConfig.checkInEarlyMinutes * 60000);
+    assert.equal(Date.parse(applied.body.data.demo_clock.max_time), Date.parse(b.end_at) - 1);
+    const anchors = (await bapp.locals.models.Booking.findById(b.id).lean()).demo_clock;
+    const secondConnection = await connect('booking');
+    const secondApp = require('../../booking-service/src/app').createApp({ connection: secondConnection, config: bookingConfig, clock, logger });
+    const secondBase = await listen(secondApp);
+    now = new Date(realAt + 2500);
+    const offsetTime = target.toISOString().replace('02:05:00.000Z', '09:05:00+07:00');
+    assert.equal((await advance(b, 'SET_TIME', { key, host: secondBase, extra: { time: offsetTime } })).status, 200);
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: target.toISOString() } })).status, 200);
+    assert.equal((await advance(b)).status, 200); // The form's activation shortcut cannot reset a manual clock.
+    assert.deepEqual((await bapp.locals.models.Booking.findById(b.id).lean()).demo_clock, anchors);
+    assert.equal((await advance(b, 'SET_TIME', { key, extra: { time: b.start_at } })).body.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: b.start_at } })).body.code, 'DEMO_TIME_BACKWARDS');
+    for (const time of [new Date(Date.parse(b.start_at) - 61 * 60000).toISOString(), b.end_at])
+      assert.equal((await advance(b, 'SET_TIME', { extra: { time } })).body.code, 'DEMO_TIME_OUT_OF_RANGE');
+    const fresh = await request(secondBase, `/api/staff/bookings/${b.id}`, staff());
+    assert.equal(Date.parse(fresh.body.data.demo_clock.business_now), +target + 2500);
+    assert.equal((await arrive(b, early)).status, 409);
+    assert.deepEqual(await data.Request.findById(early.request_id).lean(), rejected);
+    const arrival = intake(); faults.dropPost = true;
+    assert.equal((await arrive(b, arrival)).status, 202);
+    now = new Date(+now + 1500); await app.locals.worker.process(arrival.request_id);
+    const recovered = await arrive(b, arrival); assert.equal(recovered.status, 200);
+    const visit = recovered.body.data.visit;
+    assert.equal(visit.state, 'IN_CARE'); assert.equal(Date.parse(visit.checked_in_at), +target + 2500);
+    assert.equal(Date.parse(visit.checked_in_recorded_at), realAt + 2500);
+    const inCare = await bapp.locals.models.Booking.findById(b.id).lean();
+    assert.equal(inCare.status, 'CHECKED_IN');
+    assert.equal((await bapp.locals.models.Resource.findById(b.resource_id).lean()).state, 'OCCUPIED');
+    assert.deepEqual(inCare.demo_clock, anchors);
+    assert.equal(await data.Visit.countDocuments({ booking_id: b.id }), 1);
+    assert.equal(await bapp.locals.models.History.countDocuments({ booking_id: b.id, action: 'CHECKED_IN' }), 1);
+    const log = await request(base, `/api/care/visits/${visit.id}/logs`, staff({ method: 'POST', body: { request_id: randomUUID(), activity: 'OBSERVE', notes: 'Demo observation' } }));
+    assert.equal(log.status, 201); assert.equal(Date.parse(log.body.data.log.occurred_at), +target + 4000);
+    assert.equal(Date.parse(log.body.data.log.created_at), +now);
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: new Date(Date.parse(b.start_at) + 20 * 60000).toISOString() } })).status, 200);
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: new Date(Date.parse(b.end_at) + 1).toISOString() } })).body.code, 'DEMO_TIME_OUT_OF_RANGE');
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: b.end_at } })).status, 200);
+    const departure = await depart(b); assert.equal(departure.status, 201);
+    assert.equal(departure.body.data.visit.state, 'COMPLETED');
+    const completed = await bapp.locals.models.Booking.findById(b.id).lean();
+    for (const field of ['start_at', 'end_at', 'expires_at', 'total_amount', 'price_version_id', 'unit_price', 'accepted_payment_id', 'service_snapshot', 'pet_snapshot'])
+      assert.deepEqual(completed[field], before[field], field);
+    const audit = await bapp.locals.models.History.findOne({ booking_id: b.id, action: 'SET_TIME' }).lean();
+    assert.equal(+audit.at, realAt); assert.equal(+audit.business_at, +target);
+    assert.equal((await bapp.locals.models.Resource.findById(b.resource_id).lean()).state, 'CLEANING');
+    assert.equal((await clean(b)).status, 200);
+    demoEnabled(false);
+  });
   await t.test('demo controls reject disabled/production, USER, unpaid, cancelled and expired bookings and arbitrary times', async () => {
     const b = await confirmed({ future: true });
     assert.equal((await advance(b)).body.code, 'DEMO_DISABLED');
-    assert.equal((await request(bookingBase, `/api/staff/bookings/${b.id}`, staff())).body.data.demo_clock, undefined);
+    assert.equal((await request(bookingBase, `/api/staff/bookings/${b.id}`, staff())).body.data.demo_clock.enabled, false);
     demoEnabled(true); bookingConfig.nodeEnv = 'production';
-    assert.equal((await advance(b)).body.code, 'DEMO_DISABLED'); delete bookingConfig.nodeEnv;
+    assert.equal((await advance(b)).body.code, 'DEMO_DISABLED');
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: b.start_at } })).body.code, 'DEMO_DISABLED'); delete bookingConfig.nodeEnv;
     assert.equal((await advance(b, 'TO_APPOINTMENT', { token: tokens.alice })).status, 403);
+    assert.equal((await advance(b, 'SET_TIME', { token: tokens.alice, extra: { time: b.start_at } })).status, 403);
     assert.equal((await advance(b, 'TO_APPOINTMENT', { token: null })).status, 401);
     assert.equal((await advance(b, 'TO_APPOINTMENT', { extra: { business_now: b.start_at } })).status, 400);
     assert.equal((await advance(b, 'TO_APPOINTMENT', { extra: { actor_id: people.bob.id } })).status, 400);
@@ -242,16 +323,22 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
     assert.equal((await advance(b, 'TO_HANDOVER')).status, 409);
     const unpaid = await hold({ future: true });
     assert.equal((await advance(unpaid)).status, 409);
+    assert.equal((await advance(unpaid, 'SET_TIME', { extra: { time: unpaid.start_at } })).status, 409);
     await bapp.locals.models.Booking.updateOne({ _id: unpaid.id }, { $set: { status: 'CONFIRMED' } }); // legacy fixture without accepted payment
     assert.equal((await advance(unpaid)).status, 409);
     const cancelled = await request(bookingBase, `/api/bookings/${b.id}/cancel`, { method: 'POST', token: tokens.alice, key: randomUUID(), body: { reason: 'Test cancellation' } });
     assert.equal(cancelled.status, 200); assert.equal((await advance(b)).status, 409);
+    assert.equal((await advance(b, 'SET_TIME', { extra: { time: b.start_at } })).status, 409);
     const expired = await hold({ future: true }); now = new Date(+now + 16 * 60000);
     assert.equal((await request(bookingBase, `/api/staff/bookings/${expired.id}`, staff())).body.data.booking.status, 'EXPIRED');
     assert.equal((await advance(expired)).status, 409);
-    assert.equal(await bapp.locals.models.Booking.countDocuments({ demo_clock: { $exists: true } }), 0);
+    assert.equal((await advance(expired, 'SET_TIME', { extra: { time: expired.start_at } })).status, 409);
+    assert.equal(await bapp.locals.models.Booking.countDocuments({ _id: { $in: [b.id, unpaid.id, expired.id] }, demo_clock: { $exists: true } }), 0);
     assert.equal((await request(bookingBase, `/internal/bookings/${b.id}/care-time`, { credential: paymentToken })).status, 403);
     assert.equal((await request(bookingBase, `/internal/bookings/${b.id}/care-time`)).status, 401);
+    const regular = await confirmed(); assert.equal((await arrive(regular)).status, 201);
+    assert.equal((await advance(regular, 'SET_TIME', { extra: { time: regular.end_at } })).status, 409);
+    assert.equal((await depart(regular)).status, 201); await clean(regular);
   });
   await t.test('future demo clock survives new app instances, concurrent commands, lost Care responses and the full care timeline', async () => {
     const b = await confirmed({ future: true }), other = await hold({ future: true });
@@ -328,6 +415,29 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
     assert.equal((await advance(b, 'TO_HANDOVER')).status, 200);
     assert.equal((await depart(b)).status, 201); await clean(b);
   });
+  await t.test('demo reception keeps real-time maintenance and overlapping pet/resource guards', async () => {
+    const b = await confirmed({ future: true }); assert.equal((await advance(b)).status, 200);
+    const maintenance = await request(bookingBase, `/api/staff/resources/${b.resource_id}/maintenance`, staff({ method: 'POST', body: {
+      start_at: now.toISOString(), end_at: new Date(+now + 60000).toISOString(), reason: 'Test maintenance today' } }));
+    assert.equal(maintenance.status, 201, JSON.stringify(maintenance.body));
+    const refused = await arrive(b); assert.equal(refused.body.code, 'SLOT_UNAVAILABLE');
+    assert.match(refused.body.message, /resource or pet is not ready/);
+    assert.equal((await request(bookingBase, `/api/staff/resources/${b.resource_id}/maintenance/${maintenance.body.data.maintenance.id}/cancel`,
+      staff({ method: 'POST', body: { reason: 'Test maintenance resolved' } }))).status, 200);
+    assert.equal((await clean(b)).status, 200);
+    // Isolated database fixtures simulate allocation races that a clock must never bypass.
+    const overlap = await bapp.locals.models.Allocation.create({ resource_id: b.resource_id, type: 'MAINTENANCE',
+      start_at: b.start_at, end_at: b.end_at, active: true });
+    assert.equal((await arrive(b)).body.code, 'SLOT_UNAVAILABLE');
+    await bapp.locals.models.Allocation.updateOne({ _id: overlap._id }, { $set: { active: false } });
+    const { id: originalId, ...bookingFixture } = b;
+    const petBusy = await bapp.locals.models.Booking.create({ ...bookingFixture, _id: new mongoose.Types.ObjectId(),
+      status: 'CHECKED_IN', resource_id: new mongoose.Types.ObjectId() });
+    assert.equal((await arrive(b)).body.code, 'SLOT_UNAVAILABLE');
+    await bapp.locals.models.Booking.updateOne({ _id: petBusy._id }, { $set: { status: 'COMPLETED' } });
+    assert.equal((await arrive(b)).status, 201);
+    await advance(b, 'TO_HANDOVER'); assert.equal((await depart(b)).status, 201); await clean(b);
+  });
   await t.test('demo checkout uses real hold expiry for an adjacent booking and keeps allocation conflicts', async () => {
     const b = await confirmed({ future: true }); await advance(b); assert.equal((await arrive(b)).status, 201);
     const petId = randomBytes(12).toString('hex'); petRows.set(petId, { ...petRows.get(b.pet_id), id: petId });
@@ -348,7 +458,7 @@ test('Care recovers and audits against live Booking/Catalog on a real replica se
     assert.equal((await depart(b)).status, 201); await clean(b);
   });
   await t.test('disabling demo blocks new service actions without reverting time or changing old history', async () => {
-    const b = await confirmed({ future: true, serviceId: 'boarding' }); await advance(b);
+    const b = await confirmed({ future: true, serviceId: 'stay-cat-s' }); await advance(b);
     const arrival = await arrive(b); assert.equal(arrival.status, 201); const visit = arrival.body.data.visit;
     const logPath = `/api/care/visits/${visit.id}/logs`, logBody = { request_id: randomUUID(), activity: 'REST', notes: 'Resting' };
     const log = await request(base, logPath, staff({ method: 'POST', body: logBody })); assert.equal(log.status, 201);

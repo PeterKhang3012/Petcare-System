@@ -24,7 +24,7 @@ export interface CareRequest {
   visit_id: string;
   action: 'CHECK_IN' | 'CHECK_OUT';
   status: 'PENDING' | 'SUCCEEDED' | 'REJECTED';
-  result?: { code?: string; message?: string };
+  result?: { status?: number; code?: string; message?: string };
 }
 
 export const activities = {

@@ -83,8 +83,8 @@ docker compose up -d --build --no-deps --wait booking-service care-service
 Khi chạy service trực tiếp, đặt cùng cờ trong môi trường của cả Booking và Care. Cả hai từ chối khởi động nếu bật demo cùng `NODE_ENV=production`. Không cần đổi cấu hình frontend.
 
 1. Tạo booking trong tương lai bằng tài khoản USER và thanh toán thành công để Booking ở `CONFIRMED` với khoản thanh toán đã được chấp nhận.
-2. Đăng nhập STAFF, mở **Vận hành → Chi tiết lịch đặt**, bấm **Demo đến giờ hẹn**. Đồng hồ hiển thị giờ thật và giờ nghiệp vụ GMT+7; booking vẫn là `CONFIRMED`.
-3. Điền phiếu **Tiếp nhận thú cưng** hiện có. Trong hồ sơ Care, thêm nhật ký chăm sóc.
+2. Đăng nhập STAFF, mở **Vận hành → Chi tiết lịch đặt**. Điền phiếu **Tiếp nhận thú cưng**, bấm **Xác nhận tiếp nhận (giờ demo)**: giao diện chờ Booking kích hoạt giờ hẹn rồi mới gửi phiếu Care, nhận ngay dù giờ thật chưa tới hẹn. Nếu đã chọn giờ demo, phiếu giữ nguyên mốc đó.
+3. Đồng hồ hiển thị giờ thật và giờ nghiệp vụ GMT+7. Có thể chọn ngày/giờ rồi bấm **Áp dụng giờ mô phỏng**, hoặc dùng **Demo đến giờ hẹn**. API STAFF hiện có nhận `{"command":"SET_TIME","time":"2030-01-02T15:20:00+07:00"}` với `Idempotency-Key`; trước tiếp nhận chỉ chọn trong cửa sổ tiếp nhận, sau tiếp nhận chỉ tiến đến giờ bàn giao, không lùi giờ. Trong hồ sơ Care, thêm nhật ký chăm sóc.
 4. Bấm **Đến thời điểm bàn giao** ngay tại hồ sơ Care, rồi điền phiếu **Bàn giao thú cưng** để hoàn tất. Tài nguyên vẫn chuyển sang `CLEANING` và cần xác nhận vệ sinh như trước.
 
 Đồng hồ lưu trên booking và tiếp tục chạy sau khi tải lại trang hoặc khởi động lại service. Frontend cập nhật mỗi giây từ mẫu thời gian backend, không gọi API mỗi giây. Giờ đặt gốc, giá, thanh toán và hold 15 phút của các booking khác không đổi. Demo vẫn có thể bị từ chối khi tài nguyên chưa sẵn sàng, đang bảo trì hoặc có xung đột.

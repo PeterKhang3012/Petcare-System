@@ -1303,7 +1303,7 @@
     "/api/staff/bookings/{id}/demo-clock": {
       "post": {
         "summary": "STAFF advances a booking demo clock",
-        "description": "Requires PAWSTAY_DEMO_ENABLED=true outside production. TO_APPOINTMENT requires CONFIRMED and an accepted payment; TO_HANDOVER requires a demo CHECKED_IN booking. Only fixed milestones are accepted; booking status is unchanged. Idempotency-Key is required. Replays and concurrent commands retain existing anchors; replay returns the current STAFF snapshot. Existing pet/resource transaction guards serialize clocks and Care transitions. DEMO_DISABLED or an ineligible booking returns 409.",
+        "description": "Requires STAFF and PAWSTAY_DEMO_ENABLED=true outside production. TO_APPOINTMENT starts demo reception for CONFIRMED with an accepted payment; TO_HANDOVER advances a demo CHECKED_IN booking to scheduled end. SET_TIME accepts an ISO timestamp with offset: before reception it must be inside the configured check-in window (strictly before end_at); after reception it must be between checked_in_at and end_at. Business time cannot move backwards. SET_TIME fingerprints use normalized UTC; same-key replays and repeated applied targets never reset anchors. Quick commands also preserve a manually chosen clock. Stage remains TO_APPOINTMENT or TO_HANDOVER; SET_TIME is an audit action. Booking status, schedule, prices, payment, holds and real audit time are unchanged. Idempotency-Key is required; replay returns the current STAFF snapshot. Existing pet/resource transaction guards serialize clocks and Care transitions. DEMO_DISABLED, DEMO_TIME_OUT_OF_RANGE, DEMO_TIME_BACKWARDS or an ineligible booking returns 409.",
         "operationId": "post_api_staff_bookings_demo_clock",
         "parameters": [
           {
@@ -1330,20 +1330,25 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": [
-                  "command"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "command": {
-                    "type": "string",
-                    "enum": [
-                      "TO_APPOINTMENT",
-                      "TO_HANDOVER"
-                    ]
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": ["command"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "command": { "type": "string", "enum": ["TO_APPOINTMENT", "TO_HANDOVER"] }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["command", "time"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "command": { "type": "string", "enum": ["SET_TIME"] },
+                      "time": { "type": "string", "format": "date-time", "example": "2030-01-02T15:20:00+07:00" }
+                    }
                   }
-                }
+                ]
               }
             }
           }
@@ -3372,7 +3377,7 @@
       },
       "DemoClock": {
         "type": "object",
-        "description": "STAFF time sample, present when demo is enabled or this booking is already marked demo. Disabled demo bookings retain their business timeline and block new simulated actions.",
+        "description": "STAFF backend time sample, including when demo is disabled. Business time keeps running from persisted anchors. min_time/max_time give the reception window for CONFIRMED or reception-to-handover range for CHECKED_IN; SET_TIME must also not precede current business time. Disabled demo bookings retain their timeline and block new simulated actions.",
         "required": [
           "enabled",
           "is_demo",
@@ -3396,6 +3401,8 @@
             "type": "string",
             "format": "date-time"
           },
+          "min_time": { "type": "string", "format": "date-time" },
+          "max_time": { "type": "string", "format": "date-time" },
           "version": {
             "type": "integer",
             "minimum": 0
@@ -3431,7 +3438,7 @@
       },
       "DemoClockContext": {
         "type": "object",
-        "description": "Persisted booking demo anchors. Business time equals business_anchor_at plus elapsed real time. Commands advance once per stage and never replace anchors on replay.",
+        "description": "Persisted booking demo anchors. Business time equals business_anchor_at plus elapsed real time. SET_TIME advances within the current business window; stage remains TO_APPOINTMENT or TO_HANDOVER. Replays and repeated applied targets never replace anchors.",
         "required": [
           "is_demo",
           "real_anchor_at",

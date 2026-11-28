@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLoad } from '../../hooks/useLoad';
 import { Empty, Feedback, Pagination, Status } from '../../UI/Feedback';
 import { dateTime, label } from '../../utils/format';
+import { bookingRejectionMessage } from '../../api/client';
 import { CareActionForm, requestPath } from './CareActionForm';
 import { CareLogs } from './CareLogs';
 
@@ -62,7 +63,7 @@ export function CareVisit() {
     <Feedback {...result} retry={result.reload}>{visit && <>
       <header className="page-heading"><h1>{visit.snapshot.pet.name}</h1><Status value={visit.state}/></header>
       <VisitOverview visit={visit} staff={staff}/>
-      {demoBookingId && <Feedback {...booking} retry={booking.reload}>{booking.data && <DemoClockPanel details={booking.data} onChange={booking.reload}/>}</Feedback>}
+      {demoBookingId && <Feedback {...booking} retry={booking.reload}>{booking.data && <DemoClockPanel key={demoBookingId} details={booking.data}/>}</Feedback>}
       <CareLogs key={visit.id} id={visit.id} editable={staff} canAdd={staff && active}/>
       {staff && active && <CareActionForm key={visit.id} bookingId={visit.booking_id} checkout/>}
     </>}</Feedback>
@@ -85,7 +86,9 @@ export function CareRequestPage() {
     <Feedback {...result} retry={reload}>{request && <>
       <section className="panel"><header className="page-heading"><h2>{request.action === 'CHECK_IN' ? 'Tiếp nhận' : 'Bàn giao'}</h2><Status value={request.status}/></header>
         {pending && <p>Đang chờ Booking xác nhận. Trang tự kiểm tra lại.</p>}
-        {request.status === 'REJECTED' && <p role="alert">Booking từ chối yêu cầu. {request.result?.message}</p>}
+        {request.status === 'REJECTED' && <p role="alert">Booking từ chối yêu cầu ({request.result?.status ? request.result.status + ' · ' : ''}{request.result?.code || 'BOOKING_REJECTED'}).
+          {' '}{bookingRejectionMessage(request.result?.code, request.result?.message) || 'Kiểm tra trạng thái lịch và điều kiện tiếp nhận/bàn giao.'}
+          {' '}Kết quả phiếu này đã được lưu và không thay đổi. Sau khi xử lý nguyên nhân, quay lại lịch đặt hoặc hồ sơ chăm sóc để gửi phiếu mới với mã yêu cầu mới.</p>}
         <div className="actions"><Link className="button secondary" to={'/care/visits/' + request.visit_id}>Xem hồ sơ chăm sóc</Link>
           {pending && <button className="secondary" onClick={reload}>Kiểm tra lại</button>}
           {request.status === 'REJECTED' && user?.role === 'STAFF' && <Link to="/staff">Xem lịch vận hành</Link>}

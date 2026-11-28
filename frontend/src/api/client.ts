@@ -25,6 +25,24 @@ export async function data<T>(request: Promise<{ data: { data: T } }>) {
 }
 export const pathId = encodeURIComponent;
 export const idempotency = (key: string) => ({ headers: { 'Idempotency-Key': key } });
+export function bookingRejectionMessage(code?: string, message?: string) {
+  const messages: Record<string, string> = {
+    'Outside the configured check-in window': 'Ngoài cửa sổ tiếp nhận của lịch đặt. Kiểm tra giờ hẹn và giờ nghiệp vụ; nếu đang demo, chọn giờ hợp lệ trước khi gửi phiếu mới.',
+    'Check-in requires CONFIRMED': 'Tiếp nhận yêu cầu lịch ở trạng thái CONFIRMED và đã chấp nhận thanh toán.',
+    'Check-in requires CONFIRMED with an accepted payment': 'Tiếp nhận yêu cầu lịch ở trạng thái CONFIRMED và đã chấp nhận thanh toán.',
+    'Check-out requires this booking to occupy the resource': 'Bàn giao yêu cầu lịch đang CHECKED_IN và đang sử dụng đúng tài nguyên.',
+    'The resource or pet is not ready for check-in (including preparation/cleaning allocations)': 'Tài nguyên hoặc thú cưng chưa sẵn sàng: cần READY, không có lượt đang chiếm chỗ, bảo trì hoặc lịch xung đột kể cả thời gian chuẩn bị/vệ sinh.',
+    'Actual service/cleaning would overlap a future allocation; resolve the conflict before retrying with a new request_id': 'Thời gian phục vụ hoặc vệ sinh sẽ trùng lịch kế tiếp. Xử lý xung đột rồi gửi phiếu bàn giao mới.',
+  };
+  const codes: Record<string, string> = {
+    DEMO_DISABLED: 'Demo đang tắt. Bật cấu hình demo cho cả Booking và Care ngoài production để tiếp tục.',
+    DEMO_TIME_OUT_OF_RANGE: 'Giờ chọn nằm ngoài khoảng hợp lệ. Trước tiếp nhận, chọn trong cửa sổ tiếp nhận; khi đang chăm sóc, chọn từ giờ tiếp nhận đến giờ bàn giao đã hẹn.',
+    DEMO_TIME_BACKWARDS: 'Không thể lùi giờ nghiệp vụ. Chọn mốc phía trước đồng hồ đang chạy.',
+    UNAUTHORIZED: 'Phiên đăng nhập hoặc xác thực dịch vụ không hợp lệ.',
+    FORBIDDEN: 'Không có quyền thực hiện thao tác này.',
+  };
+  return messages[message || ''] || codes[code || ''];
+}
 export function errorMessage(error: unknown) {
   if (!axios.isAxiosError(error)) return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   if (!error.response) return 'Không kết nối được hoặc yêu cầu quá thời gian. Vui lòng thử lại.';
@@ -32,6 +50,8 @@ export function errorMessage(error: unknown) {
   if (status === 401) return 'Thông tin đăng nhập không đúng hoặc phiên đã hết hạn.';
   if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
   if (status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
+  const bookingMessage = bookingRejectionMessage(data?.code, data?.message);
+  if (bookingMessage) return bookingMessage;
   if (status === 409 && data?.code === 'PRICE_CHANGED') return 'Giá hoặc hồ sơ thú cưng đã thay đổi. Hãy yêu cầu báo giá mới trước khi đặt lịch.';
   if (status === 409 && data?.code === 'SLOT_UNAVAILABLE') return 'Chỗ vừa hết. Hãy chọn thời gian khác.';
   if (status === 409 && data?.code === 'PET_TIME_CONFLICT') return 'Thú cưng đã có lịch trùng với thời gian này.';

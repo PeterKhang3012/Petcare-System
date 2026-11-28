@@ -1,10 +1,10 @@
 const { randomUUID } = require('node:crypto');
-const { fail, invalid, id, text, object, fingerprint, requestKey } = require('./platform');
+const { fail, invalid, id, text, object, fingerprint, requestKey, timestamp } = require('./platform');
 const { validQuote } = require('./adapters');
 const { transaction, lock } = require('./transactions');
 const { calculate, overlap, liveAllocation, careSlots, localDay, MINUTE, DAY } = require('./time');
 const { present } = require('./models');
-const { demoEnabled, businessTime, requireDemo, clockView } = require('./demo-clock');
+const { demoEnabled, businessTime, requireDemo, clockView, receptionWindow } = require('./demo-clock');
 const activeBookings = now => ({
   $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }],
 });
@@ -70,27 +70,42 @@ class BookingService {
   async advanceDemo(bookingId, actor, key, body) {
     if (actor?.role !== 'STAFF') fail(403, 'FORBIDDEN', 'STAFF required');
     requireDemo(this.config);
-    object(body, ['command']);
-    if (!['TO_APPOINTMENT', 'TO_HANDOVER'].includes(body.command)) invalid('Invalid demo clock command');
+    object(body, body?.command === 'SET_TIME' ? ['command', 'time'] : ['command']);
+    if (!['TO_APPOINTMENT', 'TO_HANDOVER', 'SET_TIME'].includes(body.command)) invalid('Invalid demo clock command');
+    const selected = body.command === 'SET_TIME' ? timestamp(body.time, 'time') : null;
     const actorId = id(actor.id, 'actor_id'), scope = `DEMO:${actorId}`;
-    const hash = fingerprint({ booking_id: bookingId, command: body.command });
+    const hash = fingerprint({ booking_id: bookingId, command: body.command, ...(selected ? { time: selected.toISOString() } : {}) });
     return this.withBooking(bookingId, null, async (booking, session) => {
       // The same pet/resource guards serialize this clock with Care transitions.
       const previous = await this.replay(scope, key, hash, session);
       if (previous) return this.staffView(booking);
-      if (body.command === 'TO_APPOINTMENT') {
+      if (body.command === 'TO_APPOINTMENT' || (selected && booking.status !== 'CHECKED_IN')) {
         if (booking.status !== 'CONFIRMED' || !booking.accepted_payment_id)
           fail(409, 'INVALID_BOOKING_STATE', 'Demo reception requires a confirmed booking with an accepted payment');
       } else if (!booking.demo_clock?.is_demo || booking.status !== 'CHECKED_IN') {
         fail(409, 'INVALID_BOOKING_STATE', 'Demo handover requires a demo booking that is checked in');
       }
       const now = this.clock(), old = booking.demo_clock;
-      if (!old || (body.command === 'TO_HANDOVER' && old.stage !== 'TO_HANDOVER')) {
-        const target = body.command === 'TO_APPOINTMENT' ? booking.start_at : booking.end_at;
+      const current = businessTime(booking, now);
+      // Repeating an already applied target, even with a new key, never restarts the clock.
+      const unchanged = selected ? old?.is_demo && +selected === +old.business_anchor_at :
+        body.command === 'TO_APPOINTMENT' ? old?.is_demo : old?.stage === 'TO_HANDOVER';
+      if (!unchanged) {
+        const target = selected || new Date(Math.max(+current, +(body.command === 'TO_APPOINTMENT' ? booking.start_at : booking.end_at)));
+        if (booking.status === 'CONFIRMED') {
+          const range = receptionWindow(booking, this.config);
+          if (+target < +range.min_time || +target > +range.max_time)
+            fail(409, 'DEMO_TIME_OUT_OF_RANGE', 'Demo reception time must be inside the configured check-in window');
+        } else if (selected && (+target < +booking.checked_in_at || +target > +booking.end_at)) {
+          fail(409, 'DEMO_TIME_OUT_OF_RANGE', 'Demo service time must be between reception and scheduled handover');
+        }
+        if (+target < +current) fail(409, 'DEMO_TIME_BACKWARDS', 'Demo business time cannot move backwards');
         const demoClock = { is_demo: true, real_anchor_at: now,
-          business_anchor_at: new Date(Math.max(+businessTime(booking, now), +target)),
+          business_anchor_at: target,
           activated_by: old?.activated_by || actorId, activated_at: old?.activated_at || now,
-          version: (old?.version || 0) + 1, stage: body.command, updated_by: actorId, recorded_at: now };
+          version: (old?.version || 0) + 1,
+          stage: booking.status === 'CHECKED_IN' && +target >= +booking.end_at ? 'TO_HANDOVER' : 'TO_APPOINTMENT',
+          updated_by: actorId, recorded_at: now };
         await this.models.Booking.updateOne({ _id: booking._id }, { $set: { demo_clock: demoClock, updated_at: now } }, { session, timestamps: false });
         booking.demo_clock = demoClock; booking.updated_at = now;
         await this.history({ booking_id: booking._id, resource_id: booking.resource_id, action: body.command,
@@ -301,7 +316,7 @@ class BookingService {
         const earlyConflict = await this.models.Allocation.exists({ resource_id: resource._id, booking_id: { $ne: booking._id }, ...liveAllocation(now), ...overlap(actualStart, booking.allocation_end_at) }).session(session);
         const petEarlyConflict = await this.models.Booking.exists({ pet_id: booking.pet_id, _id: { $ne: booking._id }, ...overlap(new Date(Math.min(+serviceNow, +booking.start_at)), booking.end_at),
           $or: [{ status: { $in: ['CONFIRMED', 'CHECKED_IN'] } }, { status: 'PENDING_PAYMENT', expires_at: { $gt: now } }] }).session(session);
-        if (booking.status !== 'CONFIRMED') result = reject('INVALID_BOOKING_STATE', 'Check-in requires CONFIRMED');
+        if (booking.status !== 'CONFIRMED' || !booking.accepted_payment_id) result = reject('INVALID_BOOKING_STATE', 'Check-in requires CONFIRMED with an accepted payment');
         else if (+serviceNow < +booking.start_at - this.config.checkInEarlyMinutes * MINUTE || +serviceNow > +booking.start_at + this.config.checkInLateMinutes * MINUTE || +serviceNow >= +booking.end_at) result = reject('INVALID_BOOKING_STATE', 'Outside the configured check-in window');
         else if (resource.state !== 'READY' || resource.occupied_booking_id || maintenance || petInCare || earlyConflict || petEarlyConflict) result = reject('SLOT_UNAVAILABLE', 'The resource or pet is not ready for check-in (including preparation/cleaning allocations)');
         else {

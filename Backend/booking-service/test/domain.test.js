@@ -97,11 +97,11 @@ test('demo time belongs to one booking and is derived from persisted anchors aft
   assert.equal(businessTime(booking, later).toISOString(), '2030-02-01T02:00:05.000Z');
   const persisted = JSON.parse(JSON.stringify(booking));
   assert.equal(+businessTime(persisted, later), +businessTime(booking, later));
-  assert.equal(clockView({}, { demoEnabled: false }, now), undefined);
+  assert.equal(clockView({}, { demoEnabled: false }, now).enabled, false);
   const disabled = clockView(persisted, { demoEnabled: false }, later);
   assert.equal(disabled.enabled, false);
   assert.equal(+disabled.business_now, +businessTime(booking, later));
-  assert.equal(clockView({}, { demoEnabled: true, nodeEnv: 'production' }, now), undefined);
+  assert.equal(clockView({}, { demoEnabled: true, nodeEnv: 'production' }, now).enabled, false);
 });
 
 test('demo control checks STAFF and configuration before accessing booking storage', async () => {
@@ -112,6 +112,8 @@ test('demo control checks STAFF and configuration before accessing booking stora
   service.config = { demoEnabled: true, nodeEnv: 'production' };
   await assert.rejects(service.advanceDemo('b'.repeat(24), actor, 'k', { command: 'TO_APPOINTMENT' }), { code: 'DEMO_DISABLED' });
   service.config = { demoEnabled: true };
-  for (const body of [{ command: 'SET_TIME' }, { command: 'TO_APPOINTMENT', timestamp: now.toISOString() }])
+  for (const body of [{ command: 'SET_TIME' }, { command: 'TO_APPOINTMENT', timestamp: now.toISOString() },
+    { command: 'TO_APPOINTMENT', time: now.toISOString() }, { command: 'SET_TIME', time: '2030-02-30T09:00:00+07:00' },
+    { command: 'SET_TIME', time: '2030-01-02T24:00:00+07:00' }, { command: 'SET_TIME', time: '2030-01-02T09:00' }])
     await assert.rejects(service.advanceDemo('b'.repeat(24), actor, 'k', body), { code: 'VALIDATION_ERROR' });
 });

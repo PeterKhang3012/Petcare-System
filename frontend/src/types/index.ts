@@ -45,14 +45,18 @@ export interface Booking extends Quote {
   accepted_payment_id?: string;
   pet_snapshot?: { name: string };
 }
-export type DemoCommand = 'TO_APPOINTMENT' | 'TO_HANDOVER';
+export type DemoStage = 'TO_APPOINTMENT' | 'TO_HANDOVER';
+export type DemoCommand = DemoStage | 'SET_TIME';
+export type DemoClockInput = { command: DemoStage } | { command: 'SET_TIME'; time: string };
 export interface DemoClock {
   enabled: boolean;
   is_demo: boolean;
   real_now: string;
   business_now: string;
   version: number;
-  stage?: DemoCommand;
+  stage?: DemoStage;
+  min_time?: string;
+  max_time?: string;
 }
 export interface StaffBookingDetails { booking: Booking; demo_clock?: DemoClock; resource?: Resource | null }
 export interface History { id: string; at: string; action: string; reason?: string; from?: string; to?: string }

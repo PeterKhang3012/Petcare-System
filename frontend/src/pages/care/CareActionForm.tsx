@@ -2,12 +2,14 @@ import { useRef, useState, type FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { care } from '../../services/care';
+import { staff } from '../../services';
+import type { DemoClock } from '../../types';
 import { Feedback } from '../../UI/Feedback';
 
 export const requestPath = (id: string) => '/care/requests/' + encodeURIComponent(id);
 
-export function CareActionForm({ bookingId, checkout = false }: { bookingId: string; checkout?: boolean }) {
-  const request = useRef<{ fingerprint: string; id: string; input: { recipient: string; condition: string; notes: string; belongings: string[]; reason: string } } | undefined>(undefined);
+export function CareActionForm({ bookingId, checkout = false, demo }: { bookingId: string; checkout?: boolean; demo?: DemoClock }) {
+  const request = useRef<{ fingerprint: string; id: string; demoReception: boolean; clockReady: boolean; careStarted: boolean; input: { recipient: string; condition: string; notes: string; belongings: string[]; reason: string } } | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<unknown>();
@@ -15,6 +17,7 @@ export function CareActionForm({ bookingId, checkout = false }: { bookingId: str
   const navigate = useNavigate();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const form = new FormData(event.currentTarget);
     const get = (name: string) => String(form.get(name) ?? '').trim();
     const belongings = get('belongings').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
@@ -26,13 +29,28 @@ export function CareActionForm({ bookingId, checkout = false }: { bookingId: str
     const condition = get('condition');
     const notes = get('notes');
     const reason = get('reason');
+    if (!reason || (checkout ? !recipient : !condition)) {
+      setValidation('Điền đầy đủ lý do và thông tin phiếu, không chỉ nhập khoảng trắng.');
+      return;
+    }
     const fingerprint = JSON.stringify({ recipient, condition, notes, belongings, reason });
     if (!request.current || (!uncertain && request.current.fingerprint !== fingerprint))
-      request.current = { fingerprint, id: crypto.randomUUID(), input: { recipient, condition, notes, belongings, reason } };
+      request.current = { fingerprint, id: crypto.randomUUID(), demoReception: !checkout && demo?.enabled === true,
+        clockReady: false, careStarted: false, input: { recipient, condition, notes, belongings, reason } };
     const input = request.current.input;
     const common = { request_id: request.current.id, reason: input.reason };
     setBusy(true); setError(undefined); setValidation('');
     try {
+      const pending = request.current;
+      if (pending.demoReception && !pending.clockReady && !pending.careStarted) {
+        // Refresh first: a manually selected clock must survive this form's older snapshot.
+        const latest = await staff.booking(bookingId);
+        if (!latest.demo_clock?.is_demo)
+          await staff.advanceDemo(bookingId, { command: 'TO_APPOINTMENT' }, 'reception:' + pending.id);
+        pending.clockReady = true;
+      }
+      // Once Care may have received this ID, retries must go straight to its durable receipt.
+      pending.careStarted = true;
       const outcome = checkout
         ? await care.checkOut(bookingId, { ...common, recipient_name: input.recipient, notes: input.notes, returned_belongings: input.belongings })
         : await care.checkIn(bookingId, { ...common, initial_condition: input.condition, care_instructions: input.notes, belongings: input.belongings });
@@ -56,7 +74,7 @@ export function CareActionForm({ bookingId, checkout = false }: { bookingId: str
       <label>{checkout ? 'Ghi chú bàn giao' : 'Hướng dẫn chăm sóc'}<textarea name="notes" maxLength={2000} readOnly={busy || uncertain}/></label>
       <div className="full">{validation && <p className="feedback error" role="alert">{validation}</p>}<Feedback error={error}/>
         {uncertain && <p className="feedback" role="status">Chưa xác định kết quả. Gửi lại phiếu đang chờ để kiểm tra; nội dung được giữ nguyên.</p>}
-        <button disabled={busy}>{busy ? 'Đang gửi…' : uncertain ? 'Gửi lại phiếu đang chờ' : checkout ? 'Xác nhận bàn giao' : 'Xác nhận tiếp nhận'}</button></div>
+        <button disabled={busy}>{busy ? 'Đang gửi…' : uncertain ? 'Gửi lại phiếu đang chờ' : checkout ? 'Xác nhận bàn giao' : demo?.enabled ? 'Xác nhận tiếp nhận (giờ demo)' : 'Xác nhận tiếp nhận'}</button></div>
     </form>
   </section>;
 }

@@ -1,5 +1,5 @@
 import { api, data, idempotency, pathId } from '../api/client';
-import type { Booking, BookingInput, CareSlot, Credentials, DemoCommand, History, Maintenance, Page, Payment, Pet, PetInput, Quote, RegistrationInput, Resource, StaffBookingDetails, User } from '../types';
+import type { Booking, BookingInput, CareSlot, Credentials, DemoClockInput, History, Maintenance, Page, Payment, Pet, PetInput, Quote, RegistrationInput, Resource, StaffBookingDetails, User } from '../types';
 
 export const auth = {
   login: (input: Credentials) => data<{ accessToken: string }>(api.post('/auth/login', input)),
@@ -47,8 +47,8 @@ export const staff = {
   schedule: (page: number, from?: string, to?: string, group?: Resource['group']) =>
     data<Page & { bookings: Booking[] }>(api.get('/staff/bookings', { params: { page, from, to, group } })),
   booking: (id: string) => data<StaffBookingDetails>(api.get('/staff/bookings/' + pathId(id))),
-  advanceDemo: (id: string, command: DemoCommand, key: string) =>
-    data<StaffBookingDetails>(api.post('/staff/bookings/' + pathId(id) + '/demo-clock', { command }, idempotency(key))),
+  advanceDemo: (id: string, input: DemoClockInput, key: string) =>
+    data<StaffBookingDetails>(api.post('/staff/bookings/' + pathId(id) + '/demo-clock', input, idempotency(key))),
   roomOptions: (id: string) => data<{ resources: Resource[] }>(api.get('/staff/bookings/' + pathId(id) + '/room-options')),
   transferRoom: (id: string, resource_id: string, reason: string, key: string) =>
     api.post('/staff/bookings/' + pathId(id) + '/room-transfer', { resource_id, reason }, idempotency(key)),
